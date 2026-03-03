@@ -11,6 +11,8 @@ function EmployeeDashboard() {
   const [salaries, setSalaries] = useState([]);
   const [activeTab, setActiveTab] = useState("attendance");
   const [loading, setLoading] = useState(true);
+  // ── NEW: mobile sidebar state ──
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const token = localStorage.getItem("token");
   const headers = { Authorization: `Bearer ${token}` };
@@ -51,6 +53,9 @@ function EmployeeDashboard() {
     { id: "salary", icon: "💰", label: "Salary Slips" },
     { id: "profile", icon: "👤", label: "My Profile" },
   ];
+
+  // ── NEW: close sidebar on tab select ──
+  const handleTabSelect = (id) => { setActiveTab(id); setSidebarOpen(false); };
 
   return (
     <>
@@ -107,13 +112,98 @@ function EmployeeDashboard() {
         .emp-profile-val { font-size: 15px; color: white; font-weight: 500; }
         .empty-state { text-align: center; padding: 60px; color: #334155; font-size: 14px; }
         .loading { text-align: center; padding: 60px; color: #334155; }
+
+        /* ── MOBILE RESPONSIVE (CSS only additions below) ── */
+        .emp-mobile-bar { display: none; }
+        .emp-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 98; }
+        .emp-overlay.open { display: block; }
+        .emp-sidebar-close { display: none; background: none; border: none; color: #475569; font-size: 20px; cursor: pointer; margin-left: auto; line-height: 1; }
+
+        @media (max-width: 768px) {
+          /* Mobile top bar */
+          .emp-mobile-bar {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 14px 16px; background: #0d1628;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            position: sticky; top: 0; z-index: 97;
+          }
+          .emp-hamburger {
+            background: none; border: none; color: white;
+            font-size: 24px; cursor: pointer; line-height: 1; padding: 2px 6px;
+          }
+          .emp-mobile-logo { display: flex; align-items: center; gap: 8px; }
+          .emp-mobile-badge {
+            background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.2);
+            color: #60a5fa; padding: 4px 12px; border-radius: 20px;
+            font-size: 12px; font-weight: 600;
+            max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+          }
+
+          /* Sidebar slides in */
+          .emp-sidebar {
+            left: -260px; transition: left 0.28s ease;
+            z-index: 99; background: #0d1628;
+          }
+          .emp-sidebar.open { left: 0; }
+          .emp-sidebar-close { display: block; }
+
+          /* Main: full width */
+          .emp-main { margin-left: 0; padding: 16px 14px 40px; }
+          .emp-topbar { margin-bottom: 16px; }
+          .emp-greeting { font-size: 20px; }
+          .emp-sub { font-size: 12px; }
+
+          /* Stats: 2x2 grid */
+          .emp-stats { grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 16px; }
+          .emp-stat { padding: 14px 12px; border-radius: 12px; }
+          .emp-stat-num { font-size: 20px; }
+          .emp-stat-label { font-size: 9px; }
+
+          /* Card */
+          .emp-card { padding: 16px 14px; border-radius: 14px; }
+          .emp-card-title { font-size: 16px; margin-bottom: 16px; }
+
+          /* Table: horizontal scroll */
+          .emp-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+          .emp-table { min-width: 380px; }
+          .emp-table th, .emp-table td { padding: 10px 10px; font-size: 12px; }
+
+          /* Salary slip */
+          .emp-slip-header { padding: 14px 16px; }
+          .emp-slip-month { font-size: 15px; }
+          .emp-slip-amount { font-size: 24px; }
+          .emp-slip-body { padding: 14px 16px; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+          .emp-slip-item strong { font-size: 13px; }
+
+          /* Profile */
+          .emp-profile-card { flex-direction: column; gap: 16px; }
+          .emp-profile-row { flex-direction: column; align-items: flex-start; gap: 2px; padding: 12px 0; }
+          .emp-profile-key { width: auto; }
+          .emp-avatar-lg { width: 64px; height: 64px; font-size: 26px; }
+        }
       `}</style>
 
       <div className="emp-page">
-        <div className="emp-sidebar">
+
+        {/* ── Mobile top bar (NEW) ── */}
+        <div className="emp-mobile-bar">
+          <button className="emp-hamburger" onClick={() => setSidebarOpen(true)}>☰</button>
+          <div className="emp-mobile-logo">
+            <div className="emp-logo-icon">₹</div>
+            <div className="emp-logo-text">Payroll<span>Pro</span></div>
+          </div>
+          <div className="emp-mobile-badge">{employee?.name?.split(" ")[0] || "Employee"}</div>
+        </div>
+
+        {/* ── Overlay (NEW) ── */}
+        <div className={`emp-overlay ${sidebarOpen ? "open" : ""}`} onClick={() => setSidebarOpen(false)} />
+
+        {/* Sidebar — unchanged inside, just added close button + open class */}
+        <div className={`emp-sidebar ${sidebarOpen ? "open" : ""}`}>
           <div className="emp-logo">
             <div className="emp-logo-icon">₹</div>
             <div className="emp-logo-text">Payroll<span>Pro</span></div>
+            <button className="emp-sidebar-close" onClick={() => setSidebarOpen(false)}>✕</button>
           </div>
 
           {employee && (
@@ -128,7 +218,7 @@ function EmployeeDashboard() {
 
           <nav className="emp-nav">
             {tabs.map(t => (
-              <button key={t.id} className={`emp-nav-btn ${activeTab === t.id ? "active" : ""}`} onClick={() => setActiveTab(t.id)}>
+              <button key={t.id} className={`emp-nav-btn ${activeTab === t.id ? "active" : ""}`} onClick={() => handleTabSelect(t.id)}>
                 <span>{t.icon}</span> {t.label}
               </button>
             ))}
@@ -136,6 +226,7 @@ function EmployeeDashboard() {
           <button className="emp-logout" onClick={handleLogout}>🚪 Logout</button>
         </div>
 
+        {/* Main — completely unchanged */}
         <div className="emp-main">
           <div className="emp-topbar">
             <div>
@@ -170,26 +261,28 @@ function EmployeeDashboard() {
                   <>
                     <div className="emp-card-title">My Attendance History</div>
                     {attendance.length === 0 ? <div className="empty-state">No attendance records yet.</div> : (
-                      <table className="emp-table">
-                        <thead><tr><th>Date</th><th>Day</th><th>Status</th></tr></thead>
-                        <tbody>
-                          {attendance.map((item, i) => {
-                            const d = new Date(item.date);
-                            const st = statusStyle(item.status);
-                            return (
-                              <tr key={i}>
-                                <td>{d.toLocaleDateString("en-IN")}</td>
-                                <td>{d.toLocaleDateString("en-IN", { weekday: "long" })}</td>
-                                <td>
-                                  <span style={{ background: st.bg, color: st.color, border: `1px solid ${st.border}`, padding: "4px 12px", borderRadius: "20px", fontSize: "12px", fontWeight: 600 }}>
-                                    {item.status}
-                                  </span>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                      <div className="emp-table-scroll">
+                        <table className="emp-table">
+                          <thead><tr><th>Date</th><th>Day</th><th>Status</th></tr></thead>
+                          <tbody>
+                            {attendance.map((item, i) => {
+                              const d = new Date(item.date);
+                              const st = statusStyle(item.status);
+                              return (
+                                <tr key={i}>
+                                  <td>{d.toLocaleDateString("en-IN")}</td>
+                                  <td>{d.toLocaleDateString("en-IN", { weekday: "long" })}</td>
+                                  <td>
+                                    <span style={{ background: st.bg, color: st.color, border: `1px solid ${st.border}`, padding: "4px 12px", borderRadius: "20px", fontSize: "12px", fontWeight: 600 }}>
+                                      {item.status}
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
                     )}
                   </>
                 )}

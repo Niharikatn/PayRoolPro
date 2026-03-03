@@ -16,6 +16,8 @@ function AdminDashboard() {
   const [attForm, setAttForm] = useState({ employeeId: "", status: "Present", date: "" });
   const [salaryForm, setSalaryForm] = useState({ employeeId: "", month: "", year: "" });
   const [salaryResult, setSalaryResult] = useState(null);
+  // ── NEW: mobile sidebar state ──
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const token = localStorage.getItem("token");
   const headers = { Authorization: `Bearer ${token}` };
@@ -72,6 +74,9 @@ function AdminDashboard() {
     { id: "attendance", icon: "📅", label: "Attendance" },
     { id: "salary", icon: "💰", label: "Salary" },
   ];
+
+  // ── NEW: close sidebar on tab select (mobile) ──
+  const handleTabSelect = (id) => { setActiveTab(id); setSidebarOpen(false); };
 
   return (
     <>
@@ -133,18 +138,98 @@ function AdminDashboard() {
         .adm-salary-item strong { font-size: 16px; color: white; font-weight: 600; }
         .adm-salary-total { font-family: 'Syne', sans-serif; font-size: 32px; font-weight: 800; color: #eab308; }
         .empty-state { text-align: center; padding: 60px 20px; color: #334155; font-size: 15px; }
+
+        /* ── MOBILE RESPONSIVE (CSS only additions below) ── */
+        .adm-mobile-bar { display: none; }
+        .adm-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 98; }
+        .adm-overlay.open { display: block; }
+        .adm-sidebar-close { display: none; background: none; border: none; color: #475569; font-size: 20px; cursor: pointer; margin-left: auto; line-height: 1; }
+
+        @media (max-width: 768px) {
+          /* Mobile top bar */
+          .adm-mobile-bar {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 14px 16px; background: #0d1628;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            position: sticky; top: 0; z-index: 97;
+          }
+          .adm-hamburger {
+            background: none; border: none; color: white;
+            font-size: 24px; cursor: pointer; line-height: 1; padding: 2px 6px;
+          }
+          .adm-mobile-logo { display: flex; align-items: center; gap: 8px; }
+          .adm-mobile-badge {
+            background: rgba(234,179,8,0.1); border: 1px solid rgba(234,179,8,0.2);
+            color: #eab308; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;
+          }
+
+          /* Sidebar: hidden off-screen, slides in */
+          .adm-sidebar {
+            left: -260px; transition: left 0.28s ease;
+            z-index: 99; background: #0d1628;
+          }
+          .adm-sidebar.open { left: 0; }
+          .adm-sidebar-close { display: block; }
+
+          /* Main: full width, no left margin */
+          .adm-main { margin-left: 0; padding: 16px 14px 40px; }
+          .adm-topbar { margin-bottom: 16px; }
+          .adm-page-title { font-size: 20px; }
+          .adm-badge { display: none; }
+
+          /* Stats: smaller on mobile */
+          .adm-stats { gap: 8px; margin-bottom: 16px; }
+          .adm-stat { padding: 14px 10px; border-radius: 12px; }
+          .adm-stat-num { font-size: 22px; }
+          .adm-stat-label { font-size: 9px; }
+          .adm-stat-icon { display: none; }
+
+          /* Card */
+          .adm-card { padding: 16px 14px; border-radius: 14px; }
+          .adm-card-title { font-size: 16px; margin-bottom: 16px; }
+
+          /* Form: single column */
+          .adm-form-grid { grid-template-columns: 1fr; gap: 12px; margin-bottom: 16px; }
+          .adm-field input, .adm-field select { font-size: 16px; }
+          .adm-btn { width: 100%; padding: 14px; font-size: 15px; }
+
+          /* Table: horizontal scroll */
+          .adm-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+          .adm-table { min-width: 480px; }
+          .adm-table th, .adm-table td { padding: 10px 10px; font-size: 12px; }
+          .adm-del-btn { padding: 4px 8px; }
+
+          /* Salary result */
+          .adm-salary-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+          .adm-salary-total { font-size: 24px; }
+        }
       `}</style>
 
       <div className="adm-page">
-        {/* Sidebar */}
-        <div className="adm-sidebar">
-          <div className="adm-logo">
+
+        {/* ── Mobile top bar (NEW) ── */}
+        <div className="adm-mobile-bar">
+          <button className="adm-hamburger" onClick={() => setSidebarOpen(true)}>☰</button>
+          <div className="adm-mobile-logo">
             <div className="adm-logo-icon">₹</div>
             <div className="adm-logo-text">Payroll<span>Pro</span></div>
           </div>
+          <div className="adm-mobile-badge">Admin</div>
+        </div>
+
+        {/* ── Overlay (NEW) ── */}
+        <div className={`adm-overlay ${sidebarOpen ? "open" : ""}`} onClick={() => setSidebarOpen(false)} />
+
+        {/* Sidebar — unchanged inside, just added close button + open class */}
+        <div className={`adm-sidebar ${sidebarOpen ? "open" : ""}`}>
+          <div className="adm-logo">
+            <div className="adm-logo-icon">₹</div>
+            <div className="adm-logo-text">Payroll<span>Pro</span></div>
+            <button className="adm-sidebar-close" onClick={() => setSidebarOpen(false)}>✕</button>
+          </div>
           <nav className="adm-nav">
             {tabs.map(t => (
-              <button key={t.id} className={`adm-nav-btn ${activeTab === t.id ? "active" : ""}`} onClick={() => setActiveTab(t.id)}>
+              <button key={t.id} className={`adm-nav-btn ${activeTab === t.id ? "active" : ""}`} onClick={() => handleTabSelect(t.id)}>
                 <span className="adm-nav-icon">{t.icon}</span> {t.label}
               </button>
             ))}
@@ -152,7 +237,7 @@ function AdminDashboard() {
           <button className="adm-logout" onClick={handleLogout}>🚪 Logout</button>
         </div>
 
-        {/* Main */}
+        {/* Main — completely unchanged */}
         <div className="adm-main">
           <div className="adm-topbar">
             <div>
@@ -162,7 +247,6 @@ function AdminDashboard() {
             <div className="adm-badge">👤 Admin</div>
           </div>
 
-          {/* Stats */}
           <div className="adm-stats">
             <div className="adm-stat blue">
               <div className="adm-stat-icon">👥</div>
@@ -188,32 +272,32 @@ function AdminDashboard() {
           )}
 
           <div className="adm-card">
-            {/* Employees List */}
             {activeTab === "employees" && (
               <>
                 <div className="adm-card-title">All Employees</div>
                 {employees.length === 0 ? (
                   <div className="empty-state">No employees yet. Add one to get started.</div>
                 ) : (
-                  <table className="adm-table">
-                    <thead><tr><th>Name</th><th>Email</th><th>Position</th><th>Salary/Day</th><th>Action</th></tr></thead>
-                    <tbody>
-                      {employees.map(emp => (
-                        <tr key={emp._id}>
-                          <td className="adm-emp-name">{emp.name}</td>
-                          <td>{emp.email}</td>
-                          <td>{emp.position}</td>
-                          <td>₹{emp.salaryPerDay}</td>
-                          <td><button className="adm-del-btn" onClick={() => handleDeleteEmployee(emp._id)}>Delete</button></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <div className="adm-table-scroll">
+                    <table className="adm-table">
+                      <thead><tr><th>Name</th><th>Email</th><th>Position</th><th>Salary/Day</th><th>Action</th></tr></thead>
+                      <tbody>
+                        {employees.map(emp => (
+                          <tr key={emp._id}>
+                            <td className="adm-emp-name">{emp.name}</td>
+                            <td>{emp.email}</td>
+                            <td>{emp.position}</td>
+                            <td>₹{emp.salaryPerDay}</td>
+                            <td><button className="adm-del-btn" onClick={() => handleDeleteEmployee(emp._id)}>Delete</button></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </>
             )}
 
-            {/* Add Employee */}
             {activeTab === "add" && (
               <>
                 <div className="adm-card-title">Add New Employee</div>
@@ -235,7 +319,6 @@ function AdminDashboard() {
               </>
             )}
 
-            {/* Attendance */}
             {activeTab === "attendance" && (
               <>
                 <div className="adm-card-title">Mark Attendance</div>
@@ -264,7 +347,6 @@ function AdminDashboard() {
               </>
             )}
 
-            {/* Salary */}
             {activeTab === "salary" && (
               <>
                 <div className="adm-card-title">Calculate Salary</div>

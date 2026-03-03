@@ -69,7 +69,21 @@ function Login() {
         .submit-btn:disabled { opacity: 0.6; transform: none; }
         .register-link { text-align: center; margin-top: 24px; font-size: 13px; color: #475569; }
         .register-link a { color: #eab308; text-decoration: none; font-weight: 600; cursor: pointer; }
-        @media (max-width: 768px) { .login-left { display: none; } .login-right { width: 100%; border-left: none; } }
+
+        @media (max-width: 768px) {
+          .login-left { display: none; }
+          .login-right {
+            width: 100%;
+            border-left: none;
+            padding: 40px 24px;
+            align-items: flex-start;
+            padding-top: 64px;
+          }
+          .login-title { font-size: 24px; }
+          .login-sub { margin-bottom: 24px; }
+          .field input { font-size: 16px; }
+          .submit-btn { padding: 16px; font-size: 16px; }
+        }
       `}</style>
 
       <div className="login-page">
