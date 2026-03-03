@@ -5,7 +5,7 @@ import EmployeeDashBoard from "./pages/EmployeeDashBoard";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRegister from "./pages/AdminRegister";
 import EmployeeRegister from "./pages/EmployeeRegister";
-
+import "./App.css";
 function App() {
   return (
     <Routes>
