@@ -2,6 +2,7 @@ const Salary = require("../models/Salary");
 const Attendance = require("../models/Attendance");
 const Employee = require("../models/Employee");
 const { sendPayslipEmail } = require("../utils/emailService");
+const sendEmail = require("../utils/emailService");
 
 // Calculate Salary
 exports.calculateSalary = async (req, res) => {
