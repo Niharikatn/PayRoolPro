@@ -9,15 +9,18 @@ function EmployeeDashboard() {
   const [employee, setEmployee] = useState(null);
   const [attendance, setAttendance] = useState([]);
   const [salaries, setSalaries] = useState([]);
+  const [leaves, setLeaves] = useState([]);
   const [activeTab, setActiveTab] = useState("attendance");
   const [loading, setLoading] = useState(true);
-  // ── NEW: mobile sidebar state ──
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [leaveForm, setLeaveForm] = useState({ fromDate: "", toDate: "", type: "Casual Leave", reason: "" });
+  const [leaveMsg, setLeaveMsg] = useState({ text: "", type: "" });
 
   const token = localStorage.getItem("token");
   const headers = { Authorization: `Bearer ${token}` };
 
   useEffect(() => { fetchData(); }, []);
+  useEffect(() => { if (activeTab === "leaves") fetchLeaves(); }, [activeTab]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -34,7 +37,24 @@ function EmployeeDashboard() {
     finally { setLoading(false); }
   };
 
+  const fetchLeaves = async () => {
+    try { const res = await axios.get(`${API}/api/leave/my`, { headers }); setLeaves(res.data); } catch (e) {}
+  };
+
   const handleLogout = () => { localStorage.removeItem("role"); localStorage.removeItem("token"); navigate("/"); };
+
+  const handleApplyLeave = async (e) => {
+    e.preventDefault();
+    try {
+      await axios.post(`${API}/api/leave/apply`, leaveForm, { headers });
+      setLeaveMsg({ text: "Leave applied successfully!", type: "success" });
+      setLeaveForm({ fromDate: "", toDate: "", type: "Casual Leave", reason: "" });
+      fetchLeaves();
+      setTimeout(() => setLeaveMsg({ text: "", type: "" }), 4000);
+    } catch (err) {
+      setLeaveMsg({ text: err.response?.data?.message || "Failed to apply", type: "error" });
+    }
+  };
 
   const presentCount = attendance.filter(a => a.status === "Present").length;
   const absentCount = attendance.filter(a => a.status === "Absent").length;
@@ -48,13 +68,19 @@ function EmployeeDashboard() {
     return { bg: "rgba(100,116,139,0.1)", color: "#94a3b8", border: "rgba(100,116,139,0.2)" };
   };
 
+  const leaveStatusStyle = (s) => {
+    if (s === "Approved") return { color: "#86efac", bg: "rgba(34,197,94,0.1)", border: "rgba(34,197,94,0.2)" };
+    if (s === "Rejected") return { color: "#fca5a5", bg: "rgba(239,68,68,0.1)", border: "rgba(239,68,68,0.2)" };
+    return { color: "#fde68a", bg: "rgba(234,179,8,0.1)", border: "rgba(234,179,8,0.2)" };
+  };
+
   const tabs = [
     { id: "attendance", icon: "📅", label: "Attendance" },
     { id: "salary", icon: "💰", label: "Salary Slips" },
+    { id: "leaves", icon: "🗓️", label: "Leave" },
     { id: "profile", icon: "👤", label: "My Profile" },
   ];
 
-  // ── NEW: close sidebar on tab select ──
   const handleTabSelect = (id) => { setActiveTab(id); setSidebarOpen(false); };
 
   return (
@@ -92,7 +118,8 @@ function EmployeeDashboard() {
         .emp-stat-label { font-size: 11px; color: #475569; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.8px; }
         .emp-card { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 20px; padding: 32px; }
         .emp-card-title { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700; color: white; margin-bottom: 24px; }
-        .emp-table { width: 100%; border-collapse: collapse; }
+        .emp-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .emp-table { width: 100%; border-collapse: collapse; min-width: 340px; }
         .emp-table th { padding: 12px 16px; text-align: left; font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 1px solid rgba(255,255,255,0.06); }
         .emp-table td { padding: 14px 16px; font-size: 14px; color: #94a3b8; border-bottom: 1px solid rgba(255,255,255,0.03); }
         .emp-slip { border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; overflow: hidden; margin-bottom: 16px; }
@@ -112,80 +139,61 @@ function EmployeeDashboard() {
         .emp-profile-val { font-size: 15px; color: white; font-weight: 500; }
         .empty-state { text-align: center; padding: 60px; color: #334155; font-size: 14px; }
         .loading { text-align: center; padding: 60px; color: #334155; }
+        .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; }
 
-        /* ── MOBILE RESPONSIVE (CSS only additions below) ── */
+        /* Leave form */
+        .leave-section { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+        .leave-form-box { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 24px; }
+        .leave-form-title { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700; color: white; margin-bottom: 20px; }
+        .leave-field { margin-bottom: 16px; }
+        .leave-field label { display: block; font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.7px; margin-bottom: 7px; }
+        .leave-field input, .leave-field select, .leave-field textarea { width: 100%; padding: 11px 13px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 9px; font-size: 14px; color: white; outline: none; font-family: 'DM Sans', sans-serif; }
+        .leave-field textarea { resize: vertical; min-height: 90px; }
+        .leave-field select option { background: #1e293b; }
+        .leave-field input:focus, .leave-field select:focus, .leave-field textarea:focus { border-color: rgba(59,130,246,0.4); }
+        .leave-submit { width: 100%; padding: 13px; background: linear-gradient(135deg,#3b82f6,#2563eb); color: white; border: none; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; font-family: 'Syne', sans-serif; }
+        .leave-msg { padding: 10px 14px; border-radius: 9px; margin-bottom: 14px; font-size: 13px; font-weight: 500; }
+        .leave-msg.success { background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.2); color: #86efac; }
+        .leave-msg.error { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2); color: #fca5a5; }
+
+        /* Mobile */
         .emp-mobile-bar { display: none; }
         .emp-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 98; }
         .emp-overlay.open { display: block; }
         .emp-sidebar-close { display: none; background: none; border: none; color: #475569; font-size: 20px; cursor: pointer; margin-left: auto; line-height: 1; }
 
         @media (max-width: 768px) {
-          /* Mobile top bar */
-          .emp-mobile-bar {
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 14px 16px; background: #0d1628;
-            border-bottom: 1px solid rgba(255,255,255,0.06);
-            position: sticky; top: 0; z-index: 97;
-          }
-          .emp-hamburger {
-            background: none; border: none; color: white;
-            font-size: 24px; cursor: pointer; line-height: 1; padding: 2px 6px;
-          }
+          .emp-mobile-bar { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; background: #0d1628; border-bottom: 1px solid rgba(255,255,255,0.06); position: sticky; top: 0; z-index: 97; }
+          .emp-hamburger { background: none; border: none; color: white; font-size: 24px; cursor: pointer; line-height: 1; padding: 2px 6px; }
           .emp-mobile-logo { display: flex; align-items: center; gap: 8px; }
-          .emp-mobile-badge {
-            background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.2);
-            color: #60a5fa; padding: 4px 12px; border-radius: 20px;
-            font-size: 12px; font-weight: 600;
-            max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-          }
-
-          /* Sidebar slides in */
-          .emp-sidebar {
-            left: -260px; transition: left 0.28s ease;
-            z-index: 99; background: #0d1628;
-          }
+          .emp-mobile-badge { background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.2); color: #60a5fa; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+          .emp-sidebar { left: -260px; transition: left 0.28s ease; z-index: 99; background: #0d1628; }
           .emp-sidebar.open { left: 0; }
           .emp-sidebar-close { display: block; }
-
-          /* Main: full width */
           .emp-main { margin-left: 0; padding: 16px 14px 40px; }
           .emp-topbar { margin-bottom: 16px; }
           .emp-greeting { font-size: 20px; }
           .emp-sub { font-size: 12px; }
-
-          /* Stats: 2x2 grid */
           .emp-stats { grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 16px; }
           .emp-stat { padding: 14px 12px; border-radius: 12px; }
           .emp-stat-num { font-size: 20px; }
           .emp-stat-label { font-size: 9px; }
-
-          /* Card */
           .emp-card { padding: 16px 14px; border-radius: 14px; }
           .emp-card-title { font-size: 16px; margin-bottom: 16px; }
-
-          /* Table: horizontal scroll */
-          .emp-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-          .emp-table { min-width: 380px; }
           .emp-table th, .emp-table td { padding: 10px 10px; font-size: 12px; }
-
-          /* Salary slip */
           .emp-slip-header { padding: 14px 16px; }
           .emp-slip-month { font-size: 15px; }
-          .emp-slip-amount { font-size: 24px; }
+          .emp-slip-amount { font-size: 22px; }
           .emp-slip-body { padding: 14px 16px; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-          .emp-slip-item strong { font-size: 13px; }
-
-          /* Profile */
           .emp-profile-card { flex-direction: column; gap: 16px; }
           .emp-profile-row { flex-direction: column; align-items: flex-start; gap: 2px; padding: 12px 0; }
           .emp-profile-key { width: auto; }
           .emp-avatar-lg { width: 64px; height: 64px; font-size: 26px; }
+          .leave-section { grid-template-columns: 1fr; gap: 16px; }
         }
       `}</style>
 
       <div className="emp-page">
-
-        {/* ── Mobile top bar (NEW) ── */}
         <div className="emp-mobile-bar">
           <button className="emp-hamburger" onClick={() => setSidebarOpen(true)}>☰</button>
           <div className="emp-mobile-logo">
@@ -195,27 +203,20 @@ function EmployeeDashboard() {
           <div className="emp-mobile-badge">{employee?.name?.split(" ")[0] || "Employee"}</div>
         </div>
 
-        {/* ── Overlay (NEW) ── */}
         <div className={`emp-overlay ${sidebarOpen ? "open" : ""}`} onClick={() => setSidebarOpen(false)} />
 
-        {/* Sidebar — unchanged inside, just added close button + open class */}
         <div className={`emp-sidebar ${sidebarOpen ? "open" : ""}`}>
           <div className="emp-logo">
             <div className="emp-logo-icon">₹</div>
             <div className="emp-logo-text">Payroll<span>Pro</span></div>
             <button className="emp-sidebar-close" onClick={() => setSidebarOpen(false)}>✕</button>
           </div>
-
           {employee && (
             <div className="emp-profile-mini">
               <div className="emp-avatar-sm">{employee.name?.charAt(0)}</div>
-              <div>
-                <div className="emp-profile-name">{employee.name}</div>
-                <div className="emp-profile-pos">{employee.position}</div>
-              </div>
+              <div><div className="emp-profile-name">{employee.name}</div><div className="emp-profile-pos">{employee.position}</div></div>
             </div>
           )}
-
           <nav className="emp-nav">
             {tabs.map(t => (
               <button key={t.id} className={`emp-nav-btn ${activeTab === t.id ? "active" : ""}`} onClick={() => handleTabSelect(t.id)}>
@@ -226,7 +227,6 @@ function EmployeeDashboard() {
           <button className="emp-logout" onClick={handleLogout}>🚪 Logout</button>
         </div>
 
-        {/* Main — completely unchanged */}
         <div className="emp-main">
           <div className="emp-topbar">
             <div>
@@ -236,22 +236,10 @@ function EmployeeDashboard() {
           </div>
 
           <div className="emp-stats">
-            <div className="emp-stat blue">
-              <div className="emp-stat-num">{presentCount}</div>
-              <div className="emp-stat-label">Days Present</div>
-            </div>
-            <div className="emp-stat red">
-              <div className="emp-stat-num">{absentCount}</div>
-              <div className="emp-stat-label">Days Absent</div>
-            </div>
-            <div className="emp-stat gold">
-              <div className="emp-stat-num">{halfCount}</div>
-              <div className="emp-stat-label">Half Days</div>
-            </div>
-            <div className="emp-stat purple">
-              <div className="emp-stat-num">₹{latestSalary?.totalSalary?.toLocaleString() || "—"}</div>
-              <div className="emp-stat-label">Latest Salary</div>
-            </div>
+            <div className="emp-stat blue"><div className="emp-stat-num">{presentCount}</div><div className="emp-stat-label">Days Present</div></div>
+            <div className="emp-stat red"><div className="emp-stat-num">{absentCount}</div><div className="emp-stat-label">Days Absent</div></div>
+            <div className="emp-stat gold"><div className="emp-stat-num">{halfCount}</div><div className="emp-stat-label">Half Days</div></div>
+            <div className="emp-stat purple"><div className="emp-stat-num" style={{fontSize:"20px"}}>₹{latestSalary?.totalSalary?.toLocaleString() || "—"}</div><div className="emp-stat-label">Latest Salary</div></div>
           </div>
 
           <div className="emp-card">
@@ -272,11 +260,7 @@ function EmployeeDashboard() {
                                 <tr key={i}>
                                   <td>{d.toLocaleDateString("en-IN")}</td>
                                   <td>{d.toLocaleDateString("en-IN", { weekday: "long" })}</td>
-                                  <td>
-                                    <span style={{ background: st.bg, color: st.color, border: `1px solid ${st.border}`, padding: "4px 12px", borderRadius: "20px", fontSize: "12px", fontWeight: 600 }}>
-                                      {item.status}
-                                    </span>
-                                  </td>
+                                  <td><span style={{ background: st.bg, color: st.color, border: `1px solid ${st.border}`, padding: "4px 12px", borderRadius: "20px", fontSize: "12px", fontWeight: 600 }}>{item.status}</span></td>
                                 </tr>
                               );
                             })}
@@ -312,6 +296,53 @@ function EmployeeDashboard() {
                         </div>
                       ))
                     )}
+                  </>
+                )}
+
+                {activeTab === "leaves" && (
+                  <>
+                    <div className="emp-card-title">Leave Management</div>
+                    <div className="leave-section">
+                      {/* Apply form */}
+                      <div className="leave-form-box">
+                        <div className="leave-form-title">🗓️ Apply for Leave</div>
+                        {leaveMsg.text && <div className={`leave-msg ${leaveMsg.type}`}>{leaveMsg.text}</div>}
+                        <form onSubmit={handleApplyLeave}>
+                          <div className="leave-field"><label>Leave Type</label>
+                            <select value={leaveForm.type} onChange={e => setLeaveForm({...leaveForm, type: e.target.value})}>
+                              <option>Casual Leave</option><option>Sick Leave</option><option>Emergency Leave</option><option>Other</option>
+                            </select>
+                          </div>
+                          <div className="leave-field"><label>From Date</label><input type="date" value={leaveForm.fromDate} onChange={e => setLeaveForm({...leaveForm, fromDate: e.target.value})} required /></div>
+                          <div className="leave-field"><label>To Date</label><input type="date" value={leaveForm.toDate} onChange={e => setLeaveForm({...leaveForm, toDate: e.target.value})} required /></div>
+                          <div className="leave-field"><label>Reason</label><textarea placeholder="Briefly describe your reason..." value={leaveForm.reason} onChange={e => setLeaveForm({...leaveForm, reason: e.target.value})} required /></div>
+                          <button type="submit" className="leave-submit">Submit Leave Request</button>
+                        </form>
+                      </div>
+
+                      {/* Leave history */}
+                      <div className="leave-form-box">
+                        <div className="leave-form-title">📋 My Leave History</div>
+                        {leaves.length === 0 ? <div style={{color:"#334155",textAlign:"center",padding:"32px 0"}}>No leave requests yet.</div> : (
+                          leaves.map((leave, i) => {
+                            const st = leaveStatusStyle(leave.status);
+                            return (
+                              <div key={i} style={{borderBottom:"1px solid rgba(255,255,255,0.05)",paddingBottom:"14px",marginBottom:"14px"}}>
+                                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"6px"}}>
+                                  <div>
+                                    <div style={{fontSize:"14px",fontWeight:600,color:"white"}}>{leave.type}</div>
+                                    <div style={{fontSize:"12px",color:"#475569",marginTop:"2px"}}>{new Date(leave.fromDate).toLocaleDateString("en-IN")} → {new Date(leave.toDate).toLocaleDateString("en-IN")}</div>
+                                  </div>
+                                  <span className="status-badge" style={{background:st.bg,color:st.color,border:`1px solid ${st.border}`}}>{leave.status}</span>
+                                </div>
+                                <div style={{fontSize:"13px",color:"#64748b"}}>{leave.reason}</div>
+                                {leave.adminNote && <div style={{fontSize:"12px",color:"#60a5fa",marginTop:"4px"}}>Note: {leave.adminNote}</div>}
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
                   </>
                 )}
 

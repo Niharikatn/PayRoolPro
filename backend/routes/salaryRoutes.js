@@ -1,9 +1,10 @@
 const express = require("express");
 const router = express.Router();
 const protect = require("../middleware/authMiddleware");
-const { calculateSalary, getMySalaries } = require("../controllers/salaryController");
+const { calculateSalary, sendPayslip, getMySalaries } = require("../controllers/salaryController");
 
 router.post("/calculate", protect, calculateSalary);
-router.get("/me", protect, getMySalaries);   // ✅ employee's own salary slips
+router.post("/send-payslip", protect, sendPayslip);  // ✅ NEW
+router.get("/me", protect, getMySalaries);
 
 module.exports = router;
