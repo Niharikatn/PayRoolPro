@@ -2,7 +2,6 @@ const Salary = require("../models/Salary");
 const Attendance = require("../models/Attendance");
 const Employee = require("../models/Employee");
 const { sendPayslipEmail } = require("../utils/emailService");
-const sendEmail = require("../utils/emailService");
 
 // Calculate Salary
 exports.calculateSalary = async (req, res) => {
@@ -12,7 +11,6 @@ exports.calculateSalary = async (req, res) => {
     const employee = await Employee.findById(employeeId);
     if (!employee) return res.status(404).json({ message: "Employee not found" });
 
-    // Get all attendance for this employee in this month/year
     const monthIndex = ["January","February","March","April","May","June","July","August","September","October","November","December"].indexOf(month);
     const startDate = new Date(year, monthIndex, 1);
     const endDate = new Date(year, monthIndex + 1, 0);
@@ -29,7 +27,6 @@ exports.calculateSalary = async (req, res) => {
     const effectiveDays = presentDays + halfDays * 0.5;
     const totalSalary = effectiveDays * employee.salaryPerDay;
 
-    // Save or update salary record
     let salary = await Salary.findOne({ employeeId, month, year });
     if (salary) {
       salary.presentDays = presentDays;
@@ -53,6 +50,7 @@ exports.calculateSalary = async (req, res) => {
 
     res.json({ ...salary.toObject(), employeeName: employee.name });
   } catch (err) {
+    console.error("calculateSalary error:", err);
     res.status(500).json({ message: err.message });
   }
 };
@@ -60,12 +58,20 @@ exports.calculateSalary = async (req, res) => {
 // Send Payslip Email
 exports.sendPayslip = async (req, res) => {
   try {
+    console.log("=== sendPayslip called ===");
+    console.log("GMAIL_USER:", process.env.GMAIL_USER);
+    console.log("GMAIL_APP_PASSWORD exists:", !!process.env.GMAIL_APP_PASSWORD);
+
     const { salaryId } = req.body;
+    console.log("salaryId:", salaryId);
+
     const salary = await Salary.findById(salaryId);
     if (!salary) return res.status(404).json({ message: "Salary record not found" });
+    console.log("Salary found:", salary.employeeName);
 
     const employee = await Employee.findById(salary.employeeId);
     if (!employee) return res.status(404).json({ message: "Employee not found" });
+    console.log("Sending email to:", employee.email);
 
     await sendPayslipEmail({
       toEmail: employee.email,
@@ -80,12 +86,13 @@ exports.sendPayslip = async (req, res) => {
       totalSalary: salary.totalSalary,
     });
 
-    // Mark as Paid
     salary.status = "Paid";
     await salary.save();
 
+    console.log("Email sent successfully!");
     res.json({ message: "Payslip sent successfully to " + employee.email });
   } catch (err) {
+    console.error("=== sendPayslip ERROR ===", err.message);
     res.status(500).json({ message: "Failed to send email: " + err.message });
   }
 };
