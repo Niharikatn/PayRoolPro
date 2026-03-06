@@ -8,7 +8,7 @@ function Toast({ toasts, remove }) {
   return (
     <div style={{ position:"fixed", bottom:"24px", right:"24px", zIndex:9999, display:"flex", flexDirection:"column", gap:"10px", alignItems:"flex-end" }}>
       {toasts.map(t => (
-        <div key={t.id} onClick={() => remove(t.id)} style={{ background:"#0f1020", border:`1px solid ${t.type==="error"?"rgba(244,63,94,0.25)":"rgba(167,139,250,0.25)"}`, color:t.type==="error"?"#fda4af":"#c4b5fd", padding:"13px 18px", borderRadius:"13px", fontSize:"13px", fontWeight:600, display:"flex", alignItems:"center", gap:"10px", minWidth:"260px", maxWidth:"360px", boxShadow:"0 8px 40px rgba(0,0,0,0.6)", animation:"toastIn 0.3s ease", cursor:"pointer", fontFamily:"'Instrument Sans',sans-serif" }}>
+        <div key={t.id} onClick={() => remove(t.id)} style={{ background:"#0f1020", border:`1px solid ${t.type==="error"?"rgba(244,63,94,0.25)":"rgba(167,139,250,0.25)"}`, color:t.type==="error"?"#fda4af":"#c4b5fd", padding:"13px 18px", borderRadius:"13px", fontSize:"13px", fontWeight:600, display:"flex", alignItems:"center", gap:"10px", minWidth:"200px", maxWidth:"90vw", boxShadow:"0 8px 40px rgba(0,0,0,0.6)", animation:"toastIn 0.3s ease", cursor:"pointer", fontFamily:"'Instrument Sans',sans-serif" }}>
           <span>{t.type==="error"?"❌":"✅"}</span>{t.msg}
         </div>
       ))}
@@ -107,6 +107,7 @@ function AdminDashboard() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;500;600;700;800&family=Instrument+Sans:wght@400;500;600&display=swap');
         *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+        html, body { overflow-x:hidden; max-width:100%; }
         :root {
           --bg:#06070f; --surface:#0f1020; --surface2:#161728; --surface3:#1e2035;
           --border:rgba(139,92,246,0.1); --border2:rgba(139,92,246,0.2); --border3:rgba(139,92,246,0.35);
@@ -148,7 +149,7 @@ function AdminDashboard() {
         .adm-sb-foot { padding:12px 20px 20px; border-top:1px solid var(--border); }
         .adm-out { display:flex; align-items:center; gap:10px; padding:10px 13px; border:none; background:transparent; color:var(--text3); border-radius:11px; cursor:pointer; font-size:13px; width:100%; font-family:'Instrument Sans',sans-serif; transition:all 0.15s; }
         .adm-out:hover { background:rgba(244,63,94,0.08); color:#fb7185; }
-        .adm-main { margin-left:260px; flex:1; padding:32px 34px 60px; }
+        .adm-main { margin-left:260px; flex:1; padding:32px 34px 60px; min-width:0; overflow-x:hidden; }
         .adm-topbar { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:28px; animation:fadeUp 0.4s ease; }
         .adm-ptitle { font-family:'Bricolage Grotesque',sans-serif; font-size:24px; font-weight:800; color:var(--text); letter-spacing:-0.5px; }
         .adm-psub { font-size:12px; color:var(--text3); margin-top:3px; }
@@ -169,7 +170,7 @@ function AdminDashboard() {
         .adm-card:hover { border-color:var(--border2); box-shadow:var(--card-shadow-hover); }
         .adm-card-full { background:var(--surface); border:1px solid var(--border); border-radius:22px; padding:26px; box-shadow:var(--card-shadow); position:relative; overflow:hidden; animation:fadeUp 0.4s ease 0.15s both; }
         .adm-card-full::after { content:''; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg,transparent,rgba(139,92,246,0.1),transparent); }
-        .adm-ch { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px; }
+        .adm-ch { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px; flex-wrap:wrap; gap:10px; }
         .adm-ct { font-family:'Bricolage Grotesque',sans-serif; font-size:16px; font-weight:700; color:var(--text); }
         .adm-cs { font-size:11px; color:var(--text3); margin-top:2px; }
         .adm-btn { padding:9px 18px; background:linear-gradient(135deg,#7c3aed,#ec4899); color:white; border:none; border-radius:9px; font-size:12px; font-weight:700; cursor:pointer; font-family:'Instrument Sans',sans-serif; box-shadow:0 4px 14px rgba(124,58,237,0.3); transition:all 0.2s; white-space:nowrap; }
@@ -185,12 +186,12 @@ function AdminDashboard() {
         .adm-ft span { color:var(--v3); font-weight:700; }
         .adm-ftime { font-size:10px; color:var(--text3); margin-top:2px; }
         .adm-ps { display:flex; flex-direction:column; gap:10px; }
-        .adm-ps-row { display:flex; justify-content:space-between; align-items:center; padding:12px 14px; background:var(--surface2); border:1px solid var(--border); border-radius:12px; }
-        .adm-ps-left { display:flex; align-items:center; gap:10px; }
-        .adm-ps-ico { width:32px; height:32px; border-radius:9px; display:flex; align-items:center; justify-content:center; font-size:14px; }
-        .adm-ps-name { font-size:13px; font-weight:600; color:var(--text); }
+        .adm-ps-row { display:flex; justify-content:space-between; align-items:center; padding:12px 14px; background:var(--surface2); border:1px solid var(--border); border-radius:12px; gap:8px; }
+        .adm-ps-left { display:flex; align-items:center; gap:10px; min-width:0; }
+        .adm-ps-ico { width:32px; height:32px; border-radius:9px; display:flex; align-items:center; justify-content:center; font-size:14px; flex-shrink:0; }
+        .adm-ps-name { font-size:13px; font-weight:600; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .adm-ps-month { font-size:10px; color:var(--text3); margin-top:1px; }
-        .adm-ps-amt { font-family:'Bricolage Grotesque',sans-serif; font-size:16px; font-weight:800; color:var(--v3); }
+        .adm-ps-amt { font-family:'Bricolage Grotesque',sans-serif; font-size:16px; font-weight:800; color:var(--v3); white-space:nowrap; flex-shrink:0; }
         .adm-form-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:14px; margin-bottom:20px; }
         .adm-fld label { display:block; font-size:10px; font-weight:700; color:var(--text2); text-transform:uppercase; letter-spacing:0.8px; margin-bottom:7px; }
         .adm-fld input, .adm-fld select { width:100%; padding:12px 14px; background:var(--surface2); border:1px solid var(--border); border-radius:11px; font-size:14px; color:var(--text); outline:none; font-family:'Instrument Sans',sans-serif; transition:all 0.2s; }
@@ -198,11 +199,11 @@ function AdminDashboard() {
         .adm-fld select option { background:#161728; }
         .adm-fld input:focus, .adm-fld select:focus { border-color:#8b5cf6; box-shadow:0 0 0 3px rgba(139,92,246,0.12); }
         .adm-table { width:100%; border-collapse:collapse; }
-        .adm-table th { padding:10px 14px; text-align:left; font-size:10px; font-weight:700; color:var(--text3); text-transform:uppercase; letter-spacing:1px; border-bottom:1px solid var(--border); }
+        .adm-table th { padding:10px 14px; text-align:left; font-size:10px; font-weight:700; color:var(--text3); text-transform:uppercase; letter-spacing:1px; border-bottom:1px solid var(--border); white-space:nowrap; }
         .adm-table td { padding:13px 14px; font-size:13px; color:var(--text2); border-bottom:1px solid rgba(139,92,246,0.05); }
         .adm-table tr:hover td { background:rgba(139,92,246,0.04); }
         .emp-n { color:var(--text)!important; font-weight:600!important; }
-        .del-btn { background:rgba(244,63,94,0.08); color:#fb7185; border:1px solid rgba(244,63,94,0.15); padding:5px 12px; border-radius:7px; cursor:pointer; font-size:11px; font-weight:600; transition:all 0.15s; }
+        .del-btn { background:rgba(244,63,94,0.08); color:#fb7185; border:1px solid rgba(244,63,94,0.15); padding:5px 12px; border-radius:7px; cursor:pointer; font-size:11px; font-weight:600; transition:all 0.15s; white-space:nowrap; }
         .del-btn:hover { background:rgba(244,63,94,0.15); }
         .ap-btn { background:rgba(16,185,129,0.08); color:#34d399; border:1px solid rgba(16,185,129,0.2); padding:5px 10px; border-radius:7px; cursor:pointer; font-size:11px; font-weight:700; margin-right:6px; }
         .rj-btn { background:rgba(244,63,94,0.08); color:#fb7185; border:1px solid rgba(244,63,94,0.15); padding:5px 10px; border-radius:7px; cursor:pointer; font-size:11px; font-weight:700; }
@@ -217,23 +218,47 @@ function AdminDashboard() {
         .adm-mobile-bar { display:none; }
         .adm-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:98; backdrop-filter:blur(4px); }
         .adm-overlay.open { display:block; }
-        .adm-sb-close { display:none; background:none; border:none; color:var(--text3); font-size:20px; cursor:pointer; margin-left:auto; }
+        .adm-sb-close { display:none; background:rgba(255,255,255,0.06); border:none; color:var(--text2); font-size:18px; cursor:pointer; margin-left:auto; width:34px; height:34px; border-radius:8px; align-items:center; justify-content:center; flex-shrink:0; }
+
         @media(max-width:900px){
+          html,body{overflow-x:hidden;}
           .adm-mobile-bar{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:97;}
-          .adm-hamburger{background:none;border:none;color:var(--text);font-size:22px;cursor:pointer;}
-          .adm-sb{left:-280px;transition:left 0.28s ease;}
-          .adm-sb.open{left:0;}
-          .adm-sb-close{display:block;}
-          .adm-main{margin-left:0;padding:16px 14px 40px;}
+          .adm-hamburger{background:none;border:none;color:var(--text);font-size:26px;cursor:pointer;line-height:1;padding:0;}
+          .adm-sb{left:-100vw;width:100vw;transition:left 0.3s ease;border-right:none;box-shadow:none;}
+          .adm-sb.open{left:0;box-shadow:4px 0 40px rgba(0,0,0,0.7);}
+          .adm-sb-close{display:flex;}
+          .adm-main{margin-left:0;padding:16px 14px 60px;width:100%;overflow-x:hidden;}
+          .adm-topbar{flex-direction:column;gap:6px;margin-bottom:16px;}
+          .adm-ptitle{font-size:20px;}
+          .adm-psub{font-size:11px;}
           .adm-chip{display:none;}
-          .adm-stats{grid-template-columns:repeat(3,1fr);gap:8px;}
-          .adm-stat{padding:14px 10px;}
-          .adm-st-num{font-size:26px;}
-          .adm-grid2{grid-template-columns:1fr;}
+          .adm-stats{grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;}
+          .adm-stat{padding:12px 10px;border-radius:16px;}
+          .adm-st-num{font-size:24px;letter-spacing:-1px;}
+          .adm-st-lbl{font-size:9px;}
+          .adm-st-ico{width:32px;height:32px;font-size:15px;}
+          .adm-st-top{margin-bottom:10px;}
+          .adm-st-tag{display:none;}
+          .adm-grid2{grid-template-columns:1fr;gap:12px;}
+          .adm-card{padding:18px 16px;}
+          .adm-card-full{padding:18px 16px;}
+          .adm-ch{flex-direction:column;align-items:flex-start;gap:10px;}
+          .adm-btn{width:100%;padding:13px;font-size:13px;text-align:center;}
+          .adm-email-btn{width:100%;padding:13px;font-size:13px;}
           .adm-form-grid{grid-template-columns:1fr;}
-          .adm-fld input,.adm-fld select{font-size:16px;}
-          .adm-btn,.adm-email-btn{width:100%;padding:13px;}
+          .adm-fld input,.adm-fld select{font-size:16px;padding:13px 14px;}
           .sal-grid{grid-template-columns:repeat(2,1fr);}
+          .sal-total{font-size:24px;}
+          .adm-nb{padding:13px;font-size:14px;}
+          .adm-nb-ico{width:32px;height:32px;font-size:14px;}
+          .adm-sb-header{padding:20px 16px 16px;}
+        }
+        @media(max-width:400px){
+          .adm-stat{padding:10px 8px;}
+          .adm-st-num{font-size:20px;}
+          .adm-st-ico{display:none;}
+          .sal-grid{grid-template-columns:1fr 1fr;}
+          .adm-main{padding:12px 10px 60px;}
         }
       `}</style>
 
@@ -247,7 +272,7 @@ function AdminDashboard() {
             <div className="adm-lmark">₹</div>
             <div className="adm-lname">Payroll<em>Pro</em></div>
           </div>
-          <div className="adm-chip" style={{ fontSize:"11px", padding:"5px 12px" }}>Admin</div>
+          <div style={{ width:34 }} />
         </div>
 
         <div className={`adm-overlay ${sidebarOpen?"open":""}`} onClick={() => setSidebarOpen(false)} />
@@ -307,7 +332,6 @@ function AdminDashboard() {
             <div className="adm-chip">⚙️ Admin Panel</div>
           </div>
 
-          {/* Stats */}
           <div className="adm-stats">
             <div className="adm-stat">
               <div className="adm-stat-glow" style={{ background:"#7c3aed" }} />
@@ -326,55 +350,51 @@ function AdminDashboard() {
             </div>
           </div>
 
-          {/* Overview */}
           {activeTab === "overview" && (
-            <>
-              <div className="adm-grid2">
-                <div className="adm-card">
-                  <div className="adm-ch"><div><div className="adm-ct">Recent Activity</div><div className="adm-cs">Latest actions on your team</div></div></div>
-                  <div className="adm-feed">
-                    {[
-                      { dot:"#34d399", text:<>Attendance marked for <span>your team</span></>, time:"Just now" },
-                      { dot:"#fbbf24", text:<>Leave request pending approval</>, time:"Check Leaves tab" },
-                      { dot:"#a78bfa", text:<>Salary calculations ready</>, time:"Go to Salary tab" },
-                      { dot:"#f472b6", text:<>Add new team members</>, time:"Go to Add Employee" },
-                    ].map((f,i) => (
-                      <div className="adm-fi" key={i}>
-                        <div className="adm-fd" style={{ background:f.dot, boxShadow:`0 0 6px ${f.dot}` }} />
-                        <div><div className="adm-ft">{f.text}</div><div className="adm-ftime">{f.time}</div></div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="adm-card">
-                  <div className="adm-ch"><div><div className="adm-ct">Team Summary</div><div className="adm-cs">{employees.length} employees registered</div></div><button className="adm-btn" onClick={() => setActiveTab("add")}>+ Add New</button></div>
-                  <div className="adm-ps">
-                    {employees.slice(0,3).map((e,i) => {
-                      const colors = [["rgba(124,58,237,0.12)","#a78bfa"],["rgba(20,184,166,0.12)","#2dd4bf"],["rgba(245,158,11,0.12)","#fbbf24"]];
-                      return (
-                        <div className="adm-ps-row" key={e._id}>
-                          <div className="adm-ps-left">
-                            <div className="adm-ps-ico" style={{ background:colors[i%3][0], color:colors[i%3][1] }}>👤</div>
-                            <div><div className="adm-ps-name">{e.name}</div><div className="adm-ps-month">{e.position}</div></div>
-                          </div>
-                          <div className="adm-ps-amt">₹{e.salaryPerDay}/day</div>
-                        </div>
-                      );
-                    })}
-                    {employees.length === 0 && <div className="empty-st">No employees yet. Add one!</div>}
-                  </div>
+            <div className="adm-grid2">
+              <div className="adm-card">
+                <div className="adm-ch"><div><div className="adm-ct">Recent Activity</div><div className="adm-cs">Latest actions on your team</div></div></div>
+                <div className="adm-feed">
+                  {[
+                    { dot:"#34d399", text:<>Attendance marked for <span>your team</span></>, time:"Just now" },
+                    { dot:"#fbbf24", text:<>Leave request pending approval</>, time:"Check Leaves tab" },
+                    { dot:"#a78bfa", text:<>Salary calculations ready</>, time:"Go to Salary tab" },
+                    { dot:"#f472b6", text:<>Add new team members</>, time:"Go to Add Employee" },
+                  ].map((f,i) => (
+                    <div className="adm-fi" key={i}>
+                      <div className="adm-fd" style={{ background:f.dot, boxShadow:`0 0 6px ${f.dot}` }} />
+                      <div><div className="adm-ft">{f.text}</div><div className="adm-ftime">{f.time}</div></div>
+                    </div>
+                  ))}
                 </div>
               </div>
-            </>
+              <div className="adm-card">
+                <div className="adm-ch"><div><div className="adm-ct">Team Summary</div><div className="adm-cs">{employees.length} employees registered</div></div><button className="adm-btn" onClick={() => setActiveTab("add")}>+ Add New</button></div>
+                <div className="adm-ps">
+                  {employees.slice(0,3).map((e,i) => {
+                    const colors = [["rgba(124,58,237,0.12)","#a78bfa"],["rgba(20,184,166,0.12)","#2dd4bf"],["rgba(245,158,11,0.12)","#fbbf24"]];
+                    return (
+                      <div className="adm-ps-row" key={e._id}>
+                        <div className="adm-ps-left">
+                          <div className="adm-ps-ico" style={{ background:colors[i%3][0], color:colors[i%3][1] }}>👤</div>
+                          <div><div className="adm-ps-name">{e.name}</div><div className="adm-ps-month">{e.position}</div></div>
+                        </div>
+                        <div className="adm-ps-amt">₹{e.salaryPerDay}/d</div>
+                      </div>
+                    );
+                  })}
+                  {employees.length === 0 && <div className="empty-st">No employees yet. Add one!</div>}
+                </div>
+              </div>
+            </div>
           )}
 
-          {/* Employees */}
           {activeTab === "employees" && (
             <div className="adm-card-full">
               <div className="adm-ch"><div><div className="adm-ct">All Employees</div><div className="adm-cs">{employees.length} members</div></div><button className="adm-btn" onClick={() => setActiveTab("add")}>+ Add New</button></div>
               {employees.length === 0 ? <div className="empty-st">No employees yet.</div> : (
-                <div style={{ overflowX:"auto" }}>
-                  <table className="adm-table">
+                <div style={{ overflowX:"auto", WebkitOverflowScrolling:"touch" }}>
+                  <table className="adm-table" style={{ minWidth:"480px" }}>
                     <thead><tr><th>Name</th><th>Email</th><th>Position</th><th>₹/Day</th><th>Action</th></tr></thead>
                     <tbody>{employees.map(e => (
                       <tr key={e._id}><td className="emp-n">{e.name}</td><td>{e.email}</td><td>{e.position}</td><td>₹{e.salaryPerDay}</td><td><button className="del-btn" onClick={() => handleDeleteEmployee(e._id)}>Delete</button></td></tr>
@@ -385,7 +405,6 @@ function AdminDashboard() {
             </div>
           )}
 
-          {/* Add Employee */}
           {activeTab === "add" && (
             <div className="adm-card-full">
               <div className="adm-ch"><div><div className="adm-ct">Add New Employee</div><div className="adm-cs">Fill in the details below</div></div></div>
@@ -401,7 +420,6 @@ function AdminDashboard() {
             </div>
           )}
 
-          {/* Attendance */}
           {activeTab === "attendance" && (
             <div className="adm-card-full">
               <div className="adm-ch"><div><div className="adm-ct">Mark Attendance</div><div className="adm-cs">Record daily attendance</div></div></div>
@@ -416,7 +434,6 @@ function AdminDashboard() {
             </div>
           )}
 
-          {/* Salary */}
           {activeTab === "salary" && (
             <div className="adm-card-full">
               <div className="adm-ch"><div><div className="adm-ct">Calculate Salary</div><div className="adm-cs">Monthly payroll</div></div></div>
@@ -445,13 +462,12 @@ function AdminDashboard() {
             </div>
           )}
 
-          {/* Leaves */}
           {activeTab === "leaves" && (
             <div className="adm-card-full">
               <div className="adm-ch"><div><div className="adm-ct">Leave Requests</div><div className="adm-cs">{pendingLeaves} pending approval</div></div>{pendingLeaves > 0 && <span className="badge" style={{ background:"rgba(244,63,94,0.1)",color:"#fb7185",border:"1px solid rgba(244,63,94,0.2)" }}>{pendingLeaves} Pending</span>}</div>
               {leaves.length === 0 ? <div className="empty-st">No leave requests yet.</div> : (
-                <div style={{ overflowX:"auto" }}>
-                  <table className="adm-table">
+                <div style={{ overflowX:"auto", WebkitOverflowScrolling:"touch" }}>
+                  <table className="adm-table" style={{ minWidth:"580px" }}>
                     <thead><tr><th>Employee</th><th>Type</th><th>From</th><th>To</th><th>Reason</th><th>Status</th><th>Action</th></tr></thead>
                     <tbody>{leaves.map(lv => {
                       const st = stBadge(lv.status);
@@ -461,7 +477,7 @@ function AdminDashboard() {
                           <td>{lv.type}</td>
                           <td>{new Date(lv.fromDate).toLocaleDateString("en-IN")}</td>
                           <td>{new Date(lv.toDate).toLocaleDateString("en-IN")}</td>
-                          <td style={{ maxWidth:"120px", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{lv.reason}</td>
+                          <td style={{ maxWidth:"100px", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{lv.reason}</td>
                           <td><span className="badge" style={{ background:st.bg, color:st.c, border:`1px solid ${st.br}` }}>{lv.status}</span></td>
                           <td>{lv.status==="Pending"?<><button className="ap-btn" onClick={() => handleLeaveAction(lv._id,"Approved")}>✓</button><button className="rj-btn" onClick={() => handleLeaveAction(lv._id,"Rejected")}>✗</button></>:<span style={{ color:"var(--text3)",fontSize:"11px" }}>Done</span>}</td>
                         </tr>

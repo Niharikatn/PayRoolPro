@@ -8,8 +8,8 @@ function Toast({ toasts, remove }) {
   return (
     <div style={{ position:"fixed", top:"24px", left:"50%", transform:"translateX(-50%)", zIndex:9999, display:"flex", flexDirection:"column", gap:"10px", alignItems:"center" }}>
       {toasts.map(t => (
-        <div key={t.id} onClick={() => remove(t.id)} style={{ background:"#0f1020", border:`1px solid ${t.type==="error"?"rgba(244,63,94,0.25)":"rgba(167,139,250,0.25)"}`, color:t.type==="error"?"#fda4af":"#c4b5fd", padding:"13px 18px", borderRadius:"13px", fontSize:"13px", fontWeight:600, display:"flex", alignItems:"center", gap:"10px", minWidth:"260px", maxWidth:"360px", boxShadow:"0 8px 40px rgba(0,0,0,0.6)", animation:"toastIn 0.3s ease", cursor:"pointer", fontFamily:"'Instrument Sans',sans-serif" }}>
-          <span>{t.type==="error"?"❌":"✓"}</span>{t.msg}
+        <div key={t.id} onClick={() => remove(t.id)} style={{ background:"#0f1020", border:`1px solid ${t.type==="error"?"rgba(244,63,94,0.25)":"rgba(167,139,250,0.25)"}`, color:t.type==="error"?"#fda4af":"#c4b5fd", padding:"13px 22px", borderRadius:"13px", fontSize:"13px", fontWeight:600, display:"flex", alignItems:"center", gap:"10px", minWidth:"280px", maxWidth:"420px", boxShadow:"0 8px 40px rgba(0,0,0,0.7)", animation:"toastIn 0.3s ease", cursor:"pointer", fontFamily:"'Instrument Sans',sans-serif" }}>
+          <span>{t.type==="error"?"❌":"✅"}</span>{t.msg}
         </div>
       ))}
     </div>
@@ -28,6 +28,15 @@ function EmployeeDashboard() {
   const [leaveForm, setLeaveForm] = useState({ fromDate:"", toDate:"", type:"Casual Leave", reason:"" });
   const [toasts, setToasts] = useState([]);
 
+  // Smart attendance state
+  const [attMode, setAttMode] = useState("Office");
+  const [gpsState, setGpsState] = useState("idle"); // idle | loading | verified | failed
+  const [gpsCoords, setGpsCoords] = useState({ lat:null, lng:null, distance:null });
+  const [attSettings, setAttSettings] = useState({ wfhEnabled:true, hybridEnabled:true, officeEnabled:true, wfhLimitPerMonth:8 });
+  const [wfhUsage, setWfhUsage] = useState({ wfhCount:0, limit:8, remaining:8 });
+  const [todayMarked, setTodayMarked] = useState(false);
+  const [attLoading, setAttLoading] = useState(false);
+
   const token = localStorage.getItem("token");
   const headers = { Authorization: `Bearer ${token}` };
   const prevLeavesRef = useRef([]);
@@ -41,28 +50,38 @@ function EmployeeDashboard() {
 
   useEffect(() => { fetchAll(); }, []);
 
-  // Auto-poll leaves every 30 seconds to detect admin replies
   useEffect(() => {
     fetchLeaves();
     const interval = setInterval(fetchLeaves, 30000);
     return () => clearInterval(interval);
   }, []);
 
-  // Detect when admin approves/rejects and show notification
   useEffect(() => {
     if (prevLeavesRef.current.length > 0) {
       leaves.forEach(leave => {
         const prev = prevLeavesRef.current.find(p => p._id === leave._id);
-        if (prev && prev.status === "Pending" && leave.status === "Approved") {
+        if (prev && prev.status === "Pending" && leave.status === "Approved")
           addToast(`✅ Your ${leave.type} request was Approved!`, "success");
-        }
-        if (prev && prev.status === "Pending" && leave.status === "Rejected") {
+        if (prev && prev.status === "Pending" && leave.status === "Rejected")
           addToast(`❌ Your ${leave.type} request was Rejected`, "error");
-        }
       });
     }
     prevLeavesRef.current = leaves;
   }, [leaves]);
+
+  useEffect(() => {
+    if (activeTab === "attendance") {
+      fetchAttSettings();
+      fetchWFHUsage();
+      checkTodayMarked();
+    }
+  }, [activeTab]);
+
+  // Reset GPS when mode changes
+  useEffect(() => {
+    setGpsState("idle");
+    setGpsCoords({ lat:null, lng:null, distance:null });
+  }, [attMode]);
 
   const fetchAll = async () => {
     setLoading(true);
@@ -76,12 +95,86 @@ function EmployeeDashboard() {
     } catch(e) {}
     finally { setLoading(false); }
   };
-  const fetchLeaves = async () => { try { const r = await axios.get(`${API}/api/leave/my`, { headers }); setLeaves(r.data); } catch(e){} };
+
+  const fetchLeaves = async () => {
+    try { const r = await axios.get(`${API}/api/leave/my`, { headers }); setLeaves(r.data); } catch(e) {}
+  };
+
+  const fetchAttSettings = async () => {
+    try { const r = await axios.get(`${API}/api/attendance-settings`, { headers }); setAttSettings(r.data); } catch(e) {}
+  };
+
+  const fetchWFHUsage = async () => {
+    try { const r = await axios.get(`${API}/api/attendance/wfh-count`, { headers }); setWfhUsage(r.data); } catch(e) {}
+  };
+
+  const checkTodayMarked = async () => {
+    try {
+      const r = await axios.get(`${API}/api/attendance/me`, { headers });
+      const today = new Date().toDateString();
+      const marked = r.data.some(a => new Date(a.date).toDateString() === today);
+      setTodayMarked(marked);
+    } catch(e) {}
+  };
+
   const handleLogout = () => { localStorage.removeItem("role"); localStorage.removeItem("token"); navigate("/"); };
+
   const handleApplyLeave = async (e) => {
     e.preventDefault();
-    try { await axios.post(`${API}/api/leave/apply`, leaveForm, { headers }); addToast("Leave request submitted!"); setLeaveForm({ fromDate:"", toDate:"", type:"Casual Leave", reason:"" }); fetchLeaves(); }
-    catch(err) { addToast(err.response?.data?.message||"Failed","error"); }
+    try {
+      await axios.post(`${API}/api/leave/apply`, leaveForm, { headers });
+      addToast("Leave request submitted!");
+      setLeaveForm({ fromDate:"", toDate:"", type:"Casual Leave", reason:"" });
+      fetchLeaves();
+    } catch(err) { addToast(err.response?.data?.message||"Failed","error"); }
+  };
+
+  // GPS fetch
+  const handleGetGPS = () => {
+    if (!navigator.geolocation) return addToast("Geolocation not supported by your browser", "error");
+    setGpsState("loading");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setGpsCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude, distance: null });
+        setGpsState("verified");
+        addToast("📍 Location fetched! You can now mark attendance.");
+      },
+      (err) => {
+        setGpsState("failed");
+        addToast("Could not get location. Please allow location access.", "error");
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
+  // Mark attendance
+  const handleMarkAttendance = async () => {
+    if (todayMarked) return addToast("Attendance already marked for today!", "error");
+
+    // GPS required for Office and Hybrid
+    if ((attMode === "Office" || attMode === "Hybrid") && gpsState !== "verified") {
+      return addToast("Please verify your GPS location first!", "error");
+    }
+
+    setAttLoading(true);
+    try {
+      const payload = {
+        employeeId: employee._id,
+        date: new Date().toISOString(),
+        status: "Present",
+        workMode: attMode,
+        ...(gpsCoords.lat && { latitude: gpsCoords.lat, longitude: gpsCoords.lng }),
+      };
+      await axios.post(`${API}/api/attendance`, payload, { headers });
+      addToast(`✅ Attendance marked — ${attMode} mode!`);
+      setTodayMarked(true);
+      fetchAll();
+      if (attMode === "WFH" || attMode === "Hybrid") fetchWFHUsage();
+    } catch(err) {
+      addToast(err.response?.data?.message || "Failed to mark attendance", "error");
+    } finally {
+      setAttLoading(false);
+    }
   };
 
   const presentCount = attendance.filter(a => a.status==="Present").length;
@@ -89,6 +182,7 @@ function EmployeeDashboard() {
   const halfCount = attendance.filter(a => a.status==="Half Day").length;
   const latestSalary = salaries[0];
   const attendanceRate = attendance.length > 0 ? Math.round((presentCount / attendance.length) * 100) : 0;
+  const wfhPct = Math.min(100, Math.round((wfhUsage.wfhCount / (attSettings.wfhLimitPerMonth||8)) * 100));
 
   const stBadgeAtt = (s) => {
     if(s==="Present") return {c:"#34d399",bg:"rgba(16,185,129,0.1)",br:"rgba(16,185,129,0.2)"};
@@ -101,13 +195,25 @@ function EmployeeDashboard() {
     if(s==="Rejected") return {c:"#fb7185",bg:"rgba(244,63,94,0.1)",br:"rgba(244,63,94,0.2)"};
     return {c:"#fbbf24",bg:"rgba(245,158,11,0.1)",br:"rgba(245,158,11,0.2)"};
   };
+  const modeBadge = (m) => {
+    if(m==="Office") return {c:"#a78bfa",bg:"rgba(124,58,237,0.1)",br:"rgba(124,58,237,0.2)",icon:"🏢"};
+    if(m==="WFH") return {c:"#34d399",bg:"rgba(16,185,129,0.1)",br:"rgba(16,185,129,0.2)",icon:"🏠"};
+    return {c:"#fbbf24",bg:"rgba(245,158,11,0.1)",br:"rgba(245,158,11,0.2)",icon:"🔀"};
+  };
 
   const navItems = [
     { id:"overview", icon:"▦", label:"Overview", bg:"rgba(236,72,153,0.12)", color:"#f472b6" },
-    { id:"attendance", icon:"📅", label:"Attendance", bg:"rgba(124,58,237,0.1)", color:"#a78bfa" },
+    { id:"attendance", icon:"📅", label:"Mark Attendance", bg:"rgba(124,58,237,0.1)", color:"#a78bfa" },
+    { id:"history", icon:"📋", label:"Att. History", bg:"rgba(20,184,166,0.1)", color:"#2dd4bf" },
     { id:"salary", icon:"💰", label:"Salary Slips", bg:"rgba(245,158,11,0.1)", color:"#fbbf24" },
-    { id:"leaves", icon:"🗓", label:"Leave", bg:"rgba(20,184,166,0.1)", color:"#2dd4bf" },
+    { id:"leaves", icon:"🗓", label:"Leave", bg:"rgba(16,185,129,0.1)", color:"#34d399" },
     { id:"profile", icon:"👤", label:"My Profile", bg:"rgba(99,102,241,0.1)", color:"#818cf8" },
+  ];
+
+  const modeOptions = [
+    { id:"Office", icon:"🏢", label:"Office", desc:"Working from office", req:"📍 GPS Required", reqColor:"rgba(124,58,237,0.15)", reqText:"#a78bfa", enabled: attSettings.officeEnabled },
+    { id:"WFH", icon:"🏠", label:"Work From Home", desc:"Working remotely", req:"✓ No GPS needed", reqColor:"rgba(16,185,129,0.12)", reqText:"#34d399", enabled: attSettings.wfhEnabled },
+    { id:"Hybrid", icon:"🔀", label:"Hybrid", desc:"Split office & home", req:"📍 GPS for office", reqColor:"rgba(245,158,11,0.1)", reqText:"#fbbf24", enabled: attSettings.hybridEnabled },
   ];
 
   return (
@@ -168,7 +274,6 @@ function EmployeeDashboard() {
         .emp-hero::before { content:''; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg,transparent,rgba(167,139,250,0.35),transparent); }
         .emp-hero-deco { position:absolute; right:-20px; top:-20px; width:160px; height:160px; border:1px solid rgba(139,92,246,0.15); border-radius:50%; pointer-events:none; }
         .emp-hero-deco2 { position:absolute; right:20px; top:20px; width:100px; height:100px; border:1px solid rgba(236,72,153,0.1); border-radius:50%; pointer-events:none; }
-        .emp-hero-deco3 { position:absolute; right:55px; top:55px; width:40px; height:40px; background:radial-gradient(circle,rgba(139,92,246,0.2),transparent); border-radius:50%; pointer-events:none; }
         .emp-hero-content { position:relative; z-index:1; }
         .emp-hero-content h3 { font-family:'Bricolage Grotesque',sans-serif; font-size:18px; font-weight:800; color:var(--text); margin-bottom:4px; }
         .emp-hero-content p { font-size:13px; color:var(--text2); max-width:380px; }
@@ -188,11 +293,50 @@ function EmployeeDashboard() {
         .emp-card { background:var(--surface); border:1px solid var(--border); border-radius:22px; padding:24px; box-shadow:var(--card-shadow); position:relative; overflow:hidden; transition:all 0.2s; }
         .emp-card::after { content:''; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg,transparent,rgba(236,72,153,0.08),transparent); }
         .emp-card:hover { border-color:rgba(236,72,153,0.2); box-shadow:0 8px 40px rgba(0,0,0,0.6),0 0 0 1px rgba(236,72,153,0.12); }
-        .emp-card-full { background:var(--surface); border:1px solid var(--border); border-radius:22px; padding:24px; box-shadow:var(--card-shadow); position:relative; overflow:hidden; animation:fadeUp 0.4s ease 0.1s both; }
+        .emp-card-full { background:var(--surface); border:1px solid var(--border); border-radius:22px; padding:24px; box-shadow:var(--card-shadow); position:relative; overflow:hidden; animation:fadeUp 0.4s ease 0.1s both; margin-bottom:16px; }
         .emp-card-full::after { content:''; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg,transparent,rgba(236,72,153,0.06),transparent); }
         .emp-ch { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:18px; }
         .emp-ct { font-family:'Bricolage Grotesque',sans-serif; font-size:16px; font-weight:700; color:var(--text); }
         .emp-cs { font-size:11px; color:var(--text3); margin-top:2px; }
+        /* Smart attendance styles */
+        .mode-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:20px; }
+        .mode-card { border-radius:16px; padding:20px 14px; border:1px solid var(--border); background:var(--surface2); cursor:pointer; text-align:center; transition:all 0.25s; position:relative; overflow:hidden; }
+        .mode-card:hover { border-color:var(--border2); transform:translateY(-2px); }
+        .mode-card.on-office { border-color:rgba(139,92,246,0.4); background:rgba(124,58,237,0.1); box-shadow:0 8px 30px rgba(124,58,237,0.15); }
+        .mode-card.on-WFH { border-color:rgba(16,185,129,0.4); background:rgba(16,185,129,0.08); box-shadow:0 8px 30px rgba(16,185,129,0.12); }
+        .mode-card.on-Hybrid { border-color:rgba(245,158,11,0.4); background:rgba(245,158,11,0.08); box-shadow:0 8px 30px rgba(245,158,11,0.1); }
+        .mode-card.disabled-mode { opacity:0.4; cursor:not-allowed; }
+        .mode-icon { font-size:26px; margin-bottom:8px; }
+        .mode-name { font-family:'Bricolage Grotesque',sans-serif; font-size:13px; font-weight:800; color:var(--text); margin-bottom:4px; }
+        .mode-desc { font-size:11px; color:var(--text3); }
+        .mode-req { margin-top:10px; font-size:10px; font-weight:700; padding:3px 10px; border-radius:100px; display:inline-block; }
+        .gps-panel { border-radius:16px; padding:18px 20px; margin-bottom:16px; display:flex; align-items:center; gap:16px; border:1px solid; }
+        .gps-panel.idle { background:rgba(124,58,237,0.06); border-color:rgba(139,92,246,0.2); }
+        .gps-panel.loading { background:rgba(245,158,11,0.06); border-color:rgba(245,158,11,0.2); }
+        .gps-panel.verified { background:rgba(16,185,129,0.08); border-color:rgba(16,185,129,0.25); }
+        .gps-panel.failed { background:rgba(244,63,94,0.06); border-color:rgba(244,63,94,0.2); }
+        .gps-icon-wrap { width:48px; height:48px; border-radius:13px; display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0; }
+        .gps-title { font-family:'Bricolage Grotesque',sans-serif; font-size:14px; font-weight:700; color:var(--text); margin-bottom:3px; }
+        .gps-detail { font-size:12px; color:var(--text2); }
+        .gps-coords { font-size:11px; color:var(--text3); margin-top:3px; font-family:monospace; }
+        .gps-fetch-btn { margin-left:auto; padding:10px 18px; background:linear-gradient(135deg,var(--v1),var(--pink)); color:white; border:none; border-radius:10px; font-size:12px; font-weight:700; cursor:pointer; font-family:'Instrument Sans',sans-serif; box-shadow:0 4px 14px rgba(124,58,237,0.3); white-space:nowrap; flex-shrink:0; transition:all 0.2s; }
+        .gps-fetch-btn:disabled { opacity:0.5; cursor:not-allowed; }
+        .gps-verified-badge { margin-left:auto; background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.25); color:#34d399; padding:8px 14px; border-radius:10px; font-size:12px; font-weight:700; flex-shrink:0; }
+        .wfh-quota { background:var(--surface2); border:1px solid var(--border); border-radius:14px; padding:16px 18px; margin-bottom:16px; }
+        .wfh-quota-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+        .wfh-quota-title { font-size:13px; font-weight:700; color:var(--text); }
+        .wfh-quota-nums { font-family:'Bricolage Grotesque',sans-serif; font-size:18px; font-weight:800; }
+        .wfh-track { height:6px; background:rgba(255,255,255,0.05); border-radius:100px; overflow:hidden; }
+        .wfh-fill { height:100%; border-radius:100px; transition:width 0.8s ease; }
+        .confirm-summary { background:var(--surface2); border:1px solid var(--border); border-radius:14px; padding:16px 18px; margin-bottom:16px; display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+        .confirm-item-label { font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px; }
+        .confirm-item-val { font-size:14px; font-weight:700; color:var(--text); }
+        .mark-btn { width:100%; padding:16px; border-radius:14px; font-size:15px; font-weight:800; cursor:pointer; border:none; font-family:'Bricolage Grotesque',sans-serif; transition:all 0.2s; }
+        .mark-btn-ready { background:linear-gradient(135deg,var(--v1),var(--pink)); color:white; box-shadow:0 8px 28px rgba(124,58,237,0.35); }
+        .mark-btn-ready:hover { transform:translateY(-2px); box-shadow:0 12px 36px rgba(124,58,237,0.45); }
+        .mark-btn-done { background:rgba(16,185,129,0.1); color:#34d399; border:1px solid rgba(16,185,129,0.2); cursor:not-allowed; }
+        .mark-btn-disabled { background:var(--surface2); color:var(--text3); border:1px solid var(--border); cursor:not-allowed; }
+        /* Salary & slips */
         .emp-att-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:14px; }
         .emp-att-item { background:var(--surface2); border:1px solid var(--border); border-radius:12px; padding:14px 10px; text-align:center; }
         .emp-att-num { font-family:'Bricolage Grotesque',sans-serif; font-size:22px; font-weight:800; }
@@ -224,8 +368,7 @@ function EmployeeDashboard() {
         .emp-fld textarea { resize:vertical; min-height:80px; }
         .emp-fld select option { background:#161728; }
         .emp-fld input:focus, .emp-fld select:focus, .emp-fld textarea:focus { border-color:#8b5cf6; box-shadow:0 0 0 3px rgba(139,92,246,0.12); }
-        .emp-submit { width:100%; padding:13px; background:linear-gradient(135deg,#7c3aed,#ec4899); color:white; border:none; border-radius:10px; font-size:14px; font-weight:700; cursor:pointer; font-family:'Bricolage Grotesque',sans-serif; transition:all 0.2s; box-shadow:0 6px 20px rgba(124,58,237,0.3); }
-        .emp-submit:hover { transform:translateY(-1px); box-shadow:0 8px 28px rgba(124,58,237,0.4); }
+        .emp-submit { width:100%; padding:13px; background:linear-gradient(135deg,#7c3aed,#ec4899); color:white; border:none; border-radius:10px; font-size:14px; font-weight:700; cursor:pointer; font-family:'Bricolage Grotesque',sans-serif; transition:all 0.2s; }
         .emp-lv-item { border-bottom:1px solid rgba(139,92,246,0.06); padding-bottom:12px; margin-bottom:12px; }
         .emp-lv-item:last-child { border-bottom:none; margin-bottom:0; padding-bottom:0; }
         .emp-lv-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:4px; }
@@ -247,26 +390,28 @@ function EmployeeDashboard() {
         .empty-st { text-align:center; padding:48px 20px; color:var(--text3); font-size:13px; }
         .loading-st { text-align:center; padding:60px; color:var(--text3); }
         .emp-mobile-bar { display:none; }
-        .emp-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:98; backdrop-filter:blur(4px); }
+        .emp-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:98; }
         .emp-overlay.open { display:block; }
         .emp-sb-close { display:none; background:none; border:none; color:var(--text3); font-size:20px; cursor:pointer; margin-left:auto; }
-        @media(max-width:900px){
+        @media(max-width:900px){html,body{overflow-x:hidden;}
           .emp-mobile-bar{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:97;}
           .emp-hamburger{background:none;border:none;color:var(--text);font-size:22px;cursor:pointer;}
-          .emp-sb{left:-280px;transition:left 0.28s ease;}
+          .emp-sb{left:-100vw;width:100vw;transition:left 0.3s ease;border-right:none;}
           .emp-sb.open{left:0;}
-          .emp-sb-close{display:block;}
+          .emp-sb-close{display:flex;align-items:center;justify-content:center;width:34px;height:34px;background:rgba(255,255,255,0.06);border-radius:8px;}
           .emp-main{margin-left:0;padding:16px 14px 40px;}
           .emp-hero{padding:18px 20px;}
-          .emp-hero-deco,.emp-hero-deco2,.emp-hero-deco3{display:none;}
+          .emp-hero-deco,.emp-hero-deco2{display:none;}
           .emp-stats{grid-template-columns:repeat(2,1fr);gap:10px;}
           .emp-stat{padding:16px 12px;}
           .emp-sn{font-size:24px;}
           .emp-grid2{grid-template-columns:1fr;}
+          .mode-grid{grid-template-columns:1fr;}
+          .gps-panel{flex-direction:column;align-items:flex-start;gap:12px;}
+          .gps-fetch-btn,.gps-verified-badge{margin-left:0;width:100%;}
+          .confirm-summary{grid-template-columns:1fr;}
           .emp-leave-grid{grid-template-columns:1fr;}
           .emp-profile-wrap{flex-direction:column;}
-          .emp-profile-row{flex-direction:column;align-items:flex-start;gap:2px;}
-          .emp-profile-key{width:auto;}
           .emp-fld input,.emp-fld select,.emp-fld textarea{font-size:16px;}
         }
       `}</style>
@@ -274,7 +419,6 @@ function EmployeeDashboard() {
       <Toast toasts={toasts} remove={removeToast} />
 
       <div className="emp">
-        {/* Mobile bar */}
         <div className="emp-mobile-bar">
           <button className="emp-hamburger" onClick={() => setSidebarOpen(true)}>☰</button>
           <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
@@ -286,7 +430,6 @@ function EmployeeDashboard() {
 
         <div className={`emp-overlay ${sidebarOpen?"open":""}`} onClick={() => setSidebarOpen(false)} />
 
-        {/* Sidebar */}
         <div className={`emp-sb ${sidebarOpen?"open":""}`}>
           <div className="emp-sb-header">
             <div className="emp-sb-logo">
@@ -332,25 +475,26 @@ function EmployeeDashboard() {
           </div>
         </div>
 
-        {/* Main */}
         <div className="emp-main">
           <div className="emp-topbar">
             <div className="emp-greeting">Good morning, {employee?.name?.split(" ")[0]||"there"}</div>
-            <div className="emp-sub">{new Date().toLocaleDateString("en-IN",{weekday:"long",year:"numeric",month:"long",day:"numeric"})} — Here's your workspace</div>
+            <div className="emp-sub">{new Date().toLocaleDateString("en-IN",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}</div>
           </div>
 
-          {/* Banner */}
-          <div className="emp-hero">
-            <div className="emp-hero-deco" /><div className="emp-hero-deco2" /><div className="emp-hero-deco3" />
-            <div className="emp-hero-content">
-              <h3>Your attendance this month</h3>
-              <p>You're performing well. Consistent attendance builds a strong track record.</p>
-              <div className="emp-bar-area">
-                <div className="emp-bar-top"><span>Attendance Rate</span><span>{attendanceRate}%</span></div>
-                <div className="emp-track"><div className="emp-fill" style={{ width:`${attendanceRate}%` }} /></div>
+          {/* Banner — overview only */}
+          {activeTab === "overview" && (
+            <div className="emp-hero">
+              <div className="emp-hero-deco" /><div className="emp-hero-deco2" />
+              <div className="emp-hero-content">
+                <h3>Your attendance this month</h3>
+                <p>Consistent attendance builds a strong track record.</p>
+                <div className="emp-bar-area">
+                  <div className="emp-bar-top"><span>Attendance Rate</span><span>{attendanceRate}%</span></div>
+                  <div className="emp-track"><div className="emp-fill" style={{ width:`${attendanceRate}%` }} /></div>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Stats */}
           <div className="emp-stats">
@@ -362,11 +506,11 @@ function EmployeeDashboard() {
 
           {loading ? <div className="loading-st">Loading your workspace...</div> : (
             <>
-              {/* Overview */}
+              {/* ===== OVERVIEW ===== */}
               {activeTab === "overview" && (
                 <div className="emp-grid2">
                   <div className="emp-card">
-                    <div className="emp-ch"><div><div className="emp-ct">Attendance Breakdown</div><div className="emp-cs">{attendance.length > 0 ? `${new Date(attendance[0]?.date).toLocaleString("en-IN",{month:"long",year:"numeric"})}` : "This month"}</div></div></div>
+                    <div className="emp-ch"><div><div className="emp-ct">Attendance Breakdown</div><div className="emp-cs">This month</div></div></div>
                     <div className="emp-att-grid">
                       <div className="emp-att-item"><div className="emp-att-num" style={{ color:"#34d399" }}>{presentCount}</div><div className="emp-att-lbl">Present</div></div>
                       <div className="emp-att-item"><div className="emp-att-num" style={{ color:"#fb7185" }}>{absentCount}</div><div className="emp-att-lbl">Absent</div></div>
@@ -394,18 +538,115 @@ function EmployeeDashboard() {
                 </div>
               )}
 
-              {/* Attendance */}
+              {/* ===== SMART ATTENDANCE ===== */}
               {activeTab === "attendance" && (
+                <>
+                  {/* Step 1: Mode */}
+                  <div className="emp-card-full">
+                    <div className="emp-ch">
+                      <div><div className="emp-ct">Step 1 — Select Work Mode</div><div className="emp-cs">Choose how you're working today</div></div>
+                      {todayMarked && <span className="badge" style={{ background:"rgba(16,185,129,0.1)", color:"#34d399", border:"1px solid rgba(16,185,129,0.2)", padding:"6px 14px", fontSize:"11px" }}>✓ Already marked today</span>}
+                    </div>
+                    <div className="mode-grid">
+                      {modeOptions.map(m => (
+                        <div key={m.id}
+                          className={`mode-card ${attMode===m.id?`on-${m.id}`:""} ${!m.enabled?"disabled-mode":""}`}
+                          onClick={() => { if(!m.enabled) return addToast(`${m.label} is disabled by admin`,"error"); setAttMode(m.id); }}
+                        >
+                          <div className="mode-icon">{m.icon}</div>
+                          <div className="mode-name">{m.label}</div>
+                          <div className="mode-desc">{m.desc}</div>
+                          <div className="mode-req" style={{ background:m.reqColor, color:m.reqText }}>{m.req}</div>
+                          {!m.enabled && <div style={{ marginTop:"6px", fontSize:"10px", color:"#fb7185", fontWeight:700 }}>Disabled by admin</div>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Step 2: GPS (only for Office/Hybrid) */}
+                  {(attMode === "Office" || attMode === "Hybrid") && (
+                    <div className="emp-card-full">
+                      <div className="emp-ch"><div><div className="emp-ct">Step 2 — GPS Verification</div><div className="emp-cs">You must be within the office radius</div></div></div>
+                      <div className={`gps-panel ${gpsState}`}>
+                        <div className="gps-icon-wrap" style={{ background: gpsState==="verified"?"rgba(16,185,129,0.15)":gpsState==="failed"?"rgba(244,63,94,0.12)":gpsState==="loading"?"rgba(245,158,11,0.12)":"rgba(124,58,237,0.12)" }}>
+                          {gpsState==="verified"?"✅":gpsState==="failed"?"❌":gpsState==="loading"?"⏳":"📡"}
+                        </div>
+                        <div style={{ flex:1 }}>
+                          <div className="gps-title">
+                            {gpsState==="idle"?"Location not fetched yet":gpsState==="loading"?"Getting your location...":gpsState==="verified"?"Location fetched!":"Could not get location"}
+                          </div>
+                          <div className="gps-detail">
+                            {gpsState==="idle"?"Click the button to get your current GPS coordinates":gpsState==="loading"?"Please allow location access if prompted":gpsState==="verified"?`Lat: ${gpsCoords.lat?.toFixed(5)}, Lng: ${gpsCoords.lng?.toFixed(5)}`:"Please allow location access in your browser and try again"}
+                          </div>
+                          {gpsState==="verified" && <div className="gps-coords">Accuracy: ±10m · Ready to submit</div>}
+                        </div>
+                        {gpsState === "verified"
+                          ? <div className="gps-verified-badge">✓ Verified</div>
+                          : <button className="gps-fetch-btn" onClick={handleGetGPS} disabled={gpsState==="loading"}>{gpsState==="loading"?"Fetching...":"📍 Get My Location"}</button>
+                        }
+                      </div>
+                    </div>
+                  )}
+
+                  {/* WFH Quota (for WFH/Hybrid) */}
+                  {(attMode === "WFH" || attMode === "Hybrid") && (
+                    <div className="emp-card-full">
+                      <div className="emp-ch"><div><div className="emp-ct">Step {attMode==="Hybrid"?"3":"2"} — WFH Quota</div><div className="emp-cs">Your monthly WFH usage</div></div></div>
+                      <div className="wfh-quota">
+                        <div className="wfh-quota-top">
+                          <div className="wfh-quota-title">WFH days used this month</div>
+                          <div className="wfh-quota-nums" style={{ color: wfhUsage.remaining===0?"#fb7185":"#fbbf24" }}>{wfhUsage.wfhCount} / {attSettings.wfhLimitPerMonth}</div>
+                        </div>
+                        <div className="wfh-track">
+                          <div className="wfh-fill" style={{ width:`${wfhPct}%`, background: wfhPct>=100?"linear-gradient(90deg,#f43f5e,#fb7185)":wfhPct>=75?"linear-gradient(90deg,#f59e0b,#f97316)":"linear-gradient(90deg,#10b981,#34d399)" }} />
+                        </div>
+                      </div>
+                      {wfhUsage.remaining === 0
+                        ? <div style={{ background:"rgba(244,63,94,0.08)", border:"1px solid rgba(244,63,94,0.2)", borderRadius:"11px", padding:"12px 14px", fontSize:"12px", color:"#fb7185", fontWeight:600 }}>⚠️ WFH limit reached! You have used all {attSettings.wfhLimitPerMonth} WFH days. Please come to office.</div>
+                        : <div style={{ background:"rgba(245,158,11,0.06)", border:"1px solid rgba(245,158,11,0.15)", borderRadius:"11px", padding:"12px 14px", fontSize:"12px", color:"#fbbf24" }}>You have <strong>{wfhUsage.remaining} WFH days remaining</strong> this month.</div>
+                      }
+                    </div>
+                  )}
+
+                  {/* Step 3/Final: Confirm & Mark */}
+                  <div className="emp-card-full">
+                    <div className="emp-ch"><div><div className="emp-ct">Confirm & Mark</div><div className="emp-cs">Review and submit your attendance</div></div></div>
+                    <div className="confirm-summary">
+                      <div><div className="confirm-item-label">Date</div><div className="confirm-item-val">{new Date().toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</div></div>
+                      <div><div className="confirm-item-label">Mode</div><div className="confirm-item-val">{attMode==="Office"?"🏢":attMode==="WFH"?"🏠":"🔀"} {attMode}</div></div>
+                      <div><div className="confirm-item-label">GPS</div><div className="confirm-item-val">{attMode==="WFH"?"Not required":gpsState==="verified"?"✅ Verified":"⏳ Pending"}</div></div>
+                    </div>
+                    <button
+                      className={`mark-btn ${todayMarked?"mark-btn-done":attLoading?"mark-btn-disabled":"mark-btn-ready"}`}
+                      onClick={handleMarkAttendance}
+                      disabled={todayMarked || attLoading}
+                    >
+                      {todayMarked ? "✓ Attendance Already Marked Today" : attLoading ? "Marking..." : `✓ Mark as Present — ${attMode} Mode`}
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* ===== ATTENDANCE HISTORY ===== */}
+              {activeTab === "history" && (
                 <div className="emp-card-full">
                   <div className="emp-ch"><div><div className="emp-ct">Attendance History</div><div className="emp-cs">{attendance.length} records</div></div></div>
                   {attendance.length === 0 ? <div className="empty-st">No attendance records yet.</div> : (
                     <div style={{ overflowX:"auto" }}>
                       <table className="emp-table">
-                        <thead><tr><th>Date</th><th>Day</th><th>Status</th></tr></thead>
+                        <thead><tr><th>Date</th><th>Day</th><th>Mode</th><th>Status</th></tr></thead>
                         <tbody>{attendance.map((item,i) => {
                           const d = new Date(item.date);
                           const st = stBadgeAtt(item.status);
-                          return (<tr key={i}><td style={{ fontWeight:600, color:"var(--text)" }}>{d.toLocaleDateString("en-IN")}</td><td>{d.toLocaleDateString("en-IN",{weekday:"long"})}</td><td><span className="badge" style={{ background:st.bg, color:st.c, border:`1px solid ${st.br}` }}>{item.status}</span></td></tr>);
+                          const mb = modeBadge(item.workMode||"Office");
+                          return (
+                            <tr key={i}>
+                              <td style={{ fontWeight:600, color:"var(--text)" }}>{d.toLocaleDateString("en-IN")}</td>
+                              <td>{d.toLocaleDateString("en-IN",{weekday:"long"})}</td>
+                              <td><span className="badge" style={{ background:mb.bg, color:mb.c, border:`1px solid ${mb.br}` }}>{mb.icon} {item.workMode||"Office"}</span></td>
+                              <td><span className="badge" style={{ background:st.bg, color:st.c, border:`1px solid ${st.br}` }}>{item.status}</span></td>
+                            </tr>
+                          );
                         })}</tbody>
                       </table>
                     </div>
@@ -413,7 +654,7 @@ function EmployeeDashboard() {
                 </div>
               )}
 
-              {/* Salary slips */}
+              {/* ===== SALARY ===== */}
               {activeTab === "salary" && (
                 <div className="emp-card-full">
                   <div className="emp-ch"><div><div className="emp-ct">Salary Slips</div><div className="emp-cs">{salaries.length} slips</div></div></div>
@@ -440,7 +681,7 @@ function EmployeeDashboard() {
                 </div>
               )}
 
-              {/* Leaves */}
+              {/* ===== LEAVES ===== */}
               {activeTab === "leaves" && (
                 <div className="emp-card-full">
                   <div className="emp-ch"><div><div className="emp-ct">Leave Management</div></div></div>
@@ -473,7 +714,7 @@ function EmployeeDashboard() {
                 </div>
               )}
 
-              {/* Profile */}
+              {/* ===== PROFILE ===== */}
               {activeTab === "profile" && (
                 <div className="emp-card-full">
                   <div className="emp-ch"><div><div className="emp-ct">My Profile</div></div></div>
