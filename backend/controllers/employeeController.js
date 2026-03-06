@@ -5,12 +5,12 @@ const jwt = require("jsonwebtoken");
 // Register Employee
 exports.registerEmployee = async (req, res) => {
   try {
-    const { name, email, password, position, salaryPerDay } = req.body;
+    const { name, email, password, position } = req.body;
     const existing = await Employee.findOne({ email });
     if (existing) return res.status(400).json({ message: "Employee already exists" });
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const employee = await Employee.create({ name, email, password: hashedPassword, position, salaryPerDay });
+    const employee = await Employee.create({ name, email, password: hashedPassword, position });
     res.status(201).json({ message: "Employee registered successfully", employee });
   } catch (err) {
     res.status(500).json({ message: err.message });

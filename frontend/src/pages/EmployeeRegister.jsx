@@ -12,8 +12,7 @@ function EmployeeRegister() {
     email: "",
     password: "",
     confirmPassword: "",
-    position: "",
-    salaryPerDay: ""
+    position: ""
   });
 
   const [error, setError] = useState("");
@@ -66,7 +65,6 @@ function EmployeeRegister() {
           <input style={s.input} name="password" type="password" placeholder="Password" onChange={handleChange} required />
           <input style={s.input} name="confirmPassword" type="password" placeholder="Confirm Password" onChange={handleChange} required />
           <input style={s.input} name="position" placeholder="Position (e.g. Developer)" onChange={handleChange} required />
-          <input style={s.input} name="salaryPerDay" type="number" placeholder="Salary Per Day (₹)" onChange={handleChange} required />
           <button type="submit" style={s.btn} disabled={loading}>
             {loading ? "Registering..." : "Register"}
           </button>
