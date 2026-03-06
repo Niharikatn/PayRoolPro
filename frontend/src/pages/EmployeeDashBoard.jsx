@@ -1,12 +1,12 @@
 import { useNavigate } from "react-router-dom";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import axios from "axios";
 
 const API = import.meta.env.VITE_API_URL;
 
 function Toast({ toasts, remove }) {
   return (
-    <div style={{ position:"fixed", bottom:"24px", right:"24px", zIndex:9999, display:"flex", flexDirection:"column", gap:"10px", alignItems:"flex-end" }}>
+    <div style={{ position:"fixed", top:"24px", left:"50%", transform:"translateX(-50%)", zIndex:9999, display:"flex", flexDirection:"column", gap:"10px", alignItems:"center" }}>
       {toasts.map(t => (
         <div key={t.id} onClick={() => remove(t.id)} style={{ background:"#0f1020", border:`1px solid ${t.type==="error"?"rgba(244,63,94,0.25)":"rgba(167,139,250,0.25)"}`, color:t.type==="error"?"#fda4af":"#c4b5fd", padding:"13px 18px", borderRadius:"13px", fontSize:"13px", fontWeight:600, display:"flex", alignItems:"center", gap:"10px", minWidth:"260px", maxWidth:"360px", boxShadow:"0 8px 40px rgba(0,0,0,0.6)", animation:"toastIn 0.3s ease", cursor:"pointer", fontFamily:"'Instrument Sans',sans-serif" }}>
           <span>{t.type==="error"?"❌":"✓"}</span>{t.msg}
@@ -30,16 +30,39 @@ function EmployeeDashboard() {
 
   const token = localStorage.getItem("token");
   const headers = { Authorization: `Bearer ${token}` };
+  const prevLeavesRef = useRef([]);
 
   const addToast = useCallback((msg, type="success") => {
     const id = Date.now();
     setToasts(p => [...p, { id, msg, type }]);
-    setTimeout(() => setToasts(p => p.filter(t => t.id !== id)), 4000);
+    setTimeout(() => setToasts(p => p.filter(t => t.id !== id)), 5000);
   }, []);
   const removeToast = (id) => setToasts(p => p.filter(t => t.id !== id));
 
   useEffect(() => { fetchAll(); }, []);
-  useEffect(() => { if (activeTab === "leaves") fetchLeaves(); }, [activeTab]);
+
+  // Auto-poll leaves every 30 seconds to detect admin replies
+  useEffect(() => {
+    fetchLeaves();
+    const interval = setInterval(fetchLeaves, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Detect when admin approves/rejects and show notification
+  useEffect(() => {
+    if (prevLeavesRef.current.length > 0) {
+      leaves.forEach(leave => {
+        const prev = prevLeavesRef.current.find(p => p._id === leave._id);
+        if (prev && prev.status === "Pending" && leave.status === "Approved") {
+          addToast(`✅ Your ${leave.type} request was Approved!`, "success");
+        }
+        if (prev && prev.status === "Pending" && leave.status === "Rejected") {
+          addToast(`❌ Your ${leave.type} request was Rejected`, "error");
+        }
+      });
+    }
+    prevLeavesRef.current = leaves;
+  }, [leaves]);
 
   const fetchAll = async () => {
     setLoading(true);
@@ -102,7 +125,7 @@ function EmployeeDashboard() {
           --card-shadow-hover:0 8px 40px rgba(0,0,0,0.65),0 0 0 1px rgba(139,92,246,0.2),0 1px 0 rgba(139,92,246,0.12) inset;
         }
         body { background:var(--bg); }
-        @keyframes toastIn{from{opacity:0;transform:translateX(20px);}to{opacity:1;transform:translateX(0);}}
+        @keyframes toastIn{from{opacity:0;transform:translateY(-16px) scale(0.95);}to{opacity:1;transform:translateY(0) scale(1);}}
         @keyframes fadeUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
         .emp { display:flex; min-height:100vh; background:var(--bg); font-family:'Instrument Sans',sans-serif; color:var(--text); }
         .emp-sb { width:260px; background:var(--surface); border-right:1px solid var(--border); display:flex; flex-direction:column; flex-shrink:0; box-shadow:4px 0 32px rgba(0,0,0,0.4); position:fixed; top:0; bottom:0; left:0; z-index:100; overflow-y:auto; }
