@@ -6,29 +6,20 @@ const salarySchema = new mongoose.Schema({
     ref: "Employee",
     required: true
   },
+  employeeName: { type: String },
   month: { type: String, required: true },
-  year: { type: Number, required: true },       // ✅ Added year
+  year: { type: Number, required: true },
   totalDays: { type: Number, required: true },
   presentDays: { type: Number, required: true },
-  halfDays: { type: Number, default: 0 },       // ✅ Added half days
-  absentDays: { type: Number, default: 0 },     // ✅ Added absent days
-  salaryPerDay: { type: Number, required: true },// ✅ Added for reference
-  totalSalary: { type: Number, required: true },
+  halfDays: { type: Number, default: 0 },
+  absentDays: { type: Number, default: 0 },
+  salaryPerDay: { type: Number, default: 0 },
+  totalSalary: { type: Number, default: 0 },
   status: {
     type: String,
     enum: ["Pending", "Paid"],
-    default: "Pending"                           // ✅ Payment status
+    default: "Pending"
   }
-}, { timestamps: true });
+});
 
 module.exports = mongoose.model("Salary", salarySchema);
-
-
-
-
-
-
-
-
-
-
