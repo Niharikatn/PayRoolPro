@@ -1,416 +1,480 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
 const API = import.meta.env.VITE_API_URL;
 
+function Toast({ toasts, remove }) {
+  return (
+    <div style={{ position:"fixed", bottom:"24px", right:"24px", zIndex:9999, display:"flex", flexDirection:"column", gap:"10px", alignItems:"flex-end" }}>
+      {toasts.map(t => (
+        <div key={t.id} onClick={() => remove(t.id)} style={{ background:"#0f1020", border:`1px solid ${t.type==="error"?"rgba(244,63,94,0.25)":"rgba(167,139,250,0.25)"}`, color:t.type==="error"?"#fda4af":"#c4b5fd", padding:"13px 18px", borderRadius:"13px", fontSize:"13px", fontWeight:600, display:"flex", alignItems:"center", gap:"10px", minWidth:"260px", maxWidth:"360px", boxShadow:"0 8px 40px rgba(0,0,0,0.6)", animation:"toastIn 0.3s ease", cursor:"pointer", fontFamily:"'Instrument Sans',sans-serif" }}>
+          <span>{t.type==="error"?"❌":"✅"}</span>{t.msg}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function AdminDashboard() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("employees");
+  const [activeTab, setActiveTab] = useState("overview");
   const [employees, setEmployees] = useState([]);
   const [presentToday, setPresentToday] = useState(0);
-  const [message, setMessage] = useState({ text: "", type: "" });
-  const [empForm, setEmpForm] = useState({ name: "", email: "", password: "", position: "", salaryPerDay: "" });
-  const [attForm, setAttForm] = useState({ employeeId: "", status: "Present", date: "" });
-  const [salaryForm, setSalaryForm] = useState({ employeeId: "", month: "", year: "" });
+  const [empForm, setEmpForm] = useState({ name:"", email:"", password:"", position:"", salaryPerDay:"" });
+  const [attForm, setAttForm] = useState({ employeeId:"", status:"Present", date:"" });
+  const [salaryForm, setSalaryForm] = useState({ employeeId:"", month:"", year:"" });
   const [salaryResult, setSalaryResult] = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [leaves, setLeaves] = useState([]);
   const [emailLoading, setEmailLoading] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [toasts, setToasts] = useState([]);
 
   const token = localStorage.getItem("token");
   const headers = { Authorization: `Bearer ${token}` };
 
-  const showMessage = (text, type = "success") => {
-    setMessage({ text, type });
-    setTimeout(() => setMessage({ text: "", type: "" }), 5000);
-  };
+  const addToast = useCallback((msg, type="success") => {
+    const id = Date.now();
+    setToasts(p => [...p, { id, msg, type }]);
+    setTimeout(() => setToasts(p => p.filter(t => t.id !== id)), 4000);
+  }, []);
+  const removeToast = (id) => setToasts(p => p.filter(t => t.id !== id));
 
   useEffect(() => { fetchEmployees(); fetchPresentToday(); }, []);
   useEffect(() => { if (activeTab === "leaves") fetchLeaves(); }, [activeTab]);
 
-  const fetchEmployees = async () => {
-    try { const res = await axios.get(`${API}/api/employee`, { headers }); setEmployees(res.data); } catch (e) {}
-  };
-  const fetchPresentToday = async () => {
-    try { const res = await axios.get(`${API}/api/attendance/today`, { headers }); setPresentToday(res.data.presentCount || 0); } catch (e) {}
-  };
-  const fetchLeaves = async () => {
-    try { const res = await axios.get(`${API}/api/leave/all`, { headers }); setLeaves(res.data); } catch (e) {}
-  };
+  const fetchEmployees = async () => { try { const r = await axios.get(`${API}/api/employee`, { headers }); setEmployees(r.data); } catch(e){} };
+  const fetchPresentToday = async () => { try { const r = await axios.get(`${API}/api/attendance/today`, { headers }); setPresentToday(r.data.presentCount||0); } catch(e){} };
+  const fetchLeaves = async () => { try { const r = await axios.get(`${API}/api/leave/all`, { headers }); setLeaves(r.data); } catch(e){} };
   const handleLogout = () => { localStorage.removeItem("role"); localStorage.removeItem("token"); navigate("/"); };
+
   const handleAddEmployee = async (e) => {
     e.preventDefault();
-    try {
-      await axios.post(`${API}/api/employee/register`, empForm);
-      showMessage("Employee added successfully!");
-      setEmpForm({ name: "", email: "", password: "", position: "", salaryPerDay: "" });
-      fetchEmployees();
-    } catch (err) { showMessage(err.response?.data?.message || "Failed to add employee", "error"); }
+    try { await axios.post(`${API}/api/employee/register`, empForm); addToast("Employee added!"); setEmpForm({name:"",email:"",password:"",position:"",salaryPerDay:""}); fetchEmployees(); setActiveTab("employees"); }
+    catch(err) { addToast(err.response?.data?.message||"Failed","error"); }
   };
   const handleMarkAttendance = async (e) => {
     e.preventDefault();
-    try {
-      await axios.post(`${API}/api/attendance`, attForm, { headers });
-      showMessage("Attendance marked successfully!");
-      setAttForm({ employeeId: "", status: "Present", date: "" });
-      fetchPresentToday();
-    } catch (err) { showMessage(err.response?.data?.message || "Failed", "error"); }
+    try { await axios.post(`${API}/api/attendance`, attForm, { headers }); addToast("Attendance marked!"); setAttForm({employeeId:"",status:"Present",date:""}); fetchPresentToday(); }
+    catch(err) { addToast(err.response?.data?.message||"Failed","error"); }
   };
   const handleCalculateSalary = async (e) => {
     e.preventDefault();
-    try {
-      const res = await axios.post(`${API}/api/salary/calculate`, salaryForm, { headers });
-      setSalaryResult(res.data);
-      showMessage("Salary calculated!");
-    } catch (err) { showMessage(err.response?.data?.message || "Failed", "error"); }
+    try { const r = await axios.post(`${API}/api/salary/calculate`, salaryForm, { headers }); setSalaryResult(r.data); addToast("Salary calculated!"); }
+    catch(err) { addToast(err.response?.data?.message||"Failed","error"); }
   };
   const handleSendPayslip = async () => {
-    if (!salaryResult?._id) return showMessage("Calculate salary first", "error");
+    if (!salaryResult?._id) return addToast("Calculate salary first","error");
     setEmailLoading(true);
-    try {
-      const res = await axios.post(`${API}/api/salary/send-payslip`, { salaryId: salaryResult._id }, { headers });
-      showMessage("📧 " + res.data.message);
-    } catch (err) { showMessage(err.response?.data?.message || "Failed to send email", "error"); }
+    try { const r = await axios.post(`${API}/api/salary/send-payslip`, { salaryId: salaryResult._id }, { headers }); addToast("📧 " + r.data.message); }
+    catch(err) { addToast(err.response?.data?.message||"Failed","error"); }
     finally { setEmailLoading(false); }
   };
   const handleDeleteEmployee = async (id) => {
     if (!window.confirm("Delete this employee?")) return;
-    try { await axios.delete(`${API}/api/employee/${id}`, { headers }); showMessage("Employee deleted!"); fetchEmployees(); }
-    catch (err) { showMessage("Failed to delete", "error"); }
+    try { await axios.delete(`${API}/api/employee/${id}`, { headers }); addToast("Employee deleted!"); fetchEmployees(); }
+    catch(e) { addToast("Failed","error"); }
   };
   const handleLeaveAction = async (id, status) => {
-    try {
-      await axios.put(`${API}/api/leave/${id}/status`, { status }, { headers });
-      showMessage(`Leave ${status}!`);
-      fetchLeaves();
-    } catch (err) { showMessage("Failed to update leave", "error"); }
+    try { await axios.put(`${API}/api/leave/${id}/status`, { status }, { headers }); addToast(`Leave ${status}!`); fetchLeaves(); }
+    catch(e) { addToast("Failed","error"); }
   };
 
-  const tabs = [
-    { id: "employees", icon: "👥", label: "Employees" },
-    { id: "add", icon: "➕", label: "Add Employee" },
-    { id: "attendance", icon: "📅", label: "Attendance" },
-    { id: "salary", icon: "💰", label: "Salary" },
-    { id: "leaves", icon: "🗓️", label: "Leave Requests" },
+  const pendingLeaves = leaves.filter(l => l.status==="Pending").length;
+  const absentToday = Math.max(0, employees.length - presentToday);
+
+  const stBadge = (s) => {
+    if(s==="Approved") return {c:"#34d399",bg:"rgba(16,185,129,0.1)",br:"rgba(16,185,129,0.2)"};
+    if(s==="Rejected") return {c:"#fb7185",bg:"rgba(244,63,94,0.1)",br:"rgba(244,63,94,0.2)"};
+    return {c:"#fbbf24",bg:"rgba(245,158,11,0.1)",br:"rgba(245,158,11,0.2)"};
+  };
+
+  const navGroups = [
+    { label:"Main", items:[
+      { id:"overview", icon:"▦", label:"Overview", bg:"rgba(139,92,246,0.15)", color:"#a78bfa" },
+      { id:"employees", icon:"👥", label:"Employees", bg:"rgba(20,184,166,0.1)", color:"#2dd4bf" },
+      { id:"add", icon:"➕", label:"Add Employee", bg:"rgba(99,102,241,0.1)", color:"#818cf8" },
+    ]},
+    { label:"Payroll", items:[
+      { id:"attendance", icon:"📅", label:"Attendance", bg:"rgba(245,158,11,0.1)", color:"#fbbf24" },
+      { id:"salary", icon:"💰", label:"Salary", bg:"rgba(16,185,129,0.1)", color:"#34d399" },
+      { id:"leaves", icon:"🗓", label:"Leave Requests", bg:"rgba(236,72,153,0.1)", color:"#f472b6", badge: pendingLeaves },
+    ]},
   ];
-  const handleTabSelect = (id) => { setActiveTab(id); setSidebarOpen(false); };
-
-  const pendingLeaves = leaves.filter(l => l.status === "Pending").length;
-
-  const leaveStatusStyle = (s) => {
-    if (s === "Approved") return { color: "#86efac", bg: "rgba(34,197,94,0.1)", border: "rgba(34,197,94,0.2)" };
-    if (s === "Rejected") return { color: "#fca5a5", bg: "rgba(239,68,68,0.1)", border: "rgba(239,68,68,0.2)" };
-    return { color: "#fde68a", bg: "rgba(234,179,8,0.1)", border: "rgba(234,179,8,0.2)" };
-  };
 
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
-        * { box-sizing: border-box; }
-        .adm-page { min-height: 100vh; background: #080c14; font-family: 'DM Sans', sans-serif; color: white; }
-        .adm-sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: 240px; background: rgba(255,255,255,0.02); border-right: 1px solid rgba(255,255,255,0.06); padding: 32px 16px; display: flex; flex-direction: column; z-index: 100; }
-        .adm-logo { display: flex; align-items: center; gap: 12px; padding: 0 12px; margin-bottom: 40px; }
-        .adm-logo-icon { width: 40px; height: 40px; background: linear-gradient(135deg,#eab308,#f59e0b); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 800; color: #080c14; flex-shrink: 0; }
-        .adm-logo-text { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 800; color: white; }
-        .adm-logo-text span { color: #eab308; }
-        .adm-nav { display: flex; flex-direction: column; gap: 4px; flex: 1; }
-        .adm-nav-btn { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border: none; background: transparent; color: #475569; border-radius: 10px; cursor: pointer; font-size: 14px; font-weight: 500; width: 100%; text-align: left; transition: all 0.2s; font-family: 'DM Sans', sans-serif; position: relative; }
-        .adm-nav-btn:hover { background: rgba(255,255,255,0.04); color: #94a3b8; }
-        .adm-nav-btn.active { background: rgba(234,179,8,0.1); color: #eab308; border: 1px solid rgba(234,179,8,0.2); }
-        .adm-nav-icon { font-size: 16px; }
-        .adm-nav-badge { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: #ef4444; color: white; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 20px; }
-        .adm-logout { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border: 1px solid rgba(239,68,68,0.2); background: rgba(239,68,68,0.05); color: #f87171; border-radius: 10px; cursor: pointer; font-size: 14px; font-weight: 500; width: 100%; font-family: 'DM Sans', sans-serif; transition: all 0.2s; }
-        .adm-logout:hover { background: rgba(239,68,68,0.1); }
-        .adm-main { margin-left: 240px; padding: 40px; }
-        .adm-topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 36px; }
-        .adm-page-title { font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 800; color: white; }
-        .adm-page-sub { font-size: 13px; color: #475569; margin-top: 2px; }
-        .adm-badge { background: rgba(234,179,8,0.1); border: 1px solid rgba(234,179,8,0.2); color: #eab308; padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; }
-        .adm-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 32px; }
-        .adm-stat { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; padding: 24px; position: relative; overflow: hidden; }
-        .adm-stat::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; }
-        .adm-stat.blue::before { background: linear-gradient(90deg,#3b82f6,transparent); }
-        .adm-stat.gold::before { background: linear-gradient(90deg,#eab308,transparent); }
-        .adm-stat.red::before { background: linear-gradient(90deg,#ef4444,transparent); }
-        .adm-stat-num { font-family: 'Syne', sans-serif; font-size: 36px; font-weight: 800; color: white; }
-        .adm-stat-label { font-size: 12px; color: #475569; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.8px; }
-        .adm-stat-icon { position: absolute; right: 20px; top: 20px; font-size: 28px; opacity: 0.3; }
-        .adm-msg { padding: 14px 18px; border-radius: 10px; margin-bottom: 24px; font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 8px; }
-        .adm-msg.success { background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.2); color: #86efac; }
-        .adm-msg.error { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2); color: #fca5a5; }
-        .adm-card { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 20px; padding: 32px; }
-        .adm-card-title { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700; color: white; margin-bottom: 24px; }
-        .adm-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }
-        .adm-field label { display: block; font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px; }
-        .adm-field input, .adm-field select { width: 100%; padding: 12px 14px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; font-size: 14px; color: white; outline: none; transition: all 0.2s; font-family: 'DM Sans', sans-serif; }
-        .adm-field input::placeholder { color: #334155; }
-        .adm-field select option { background: #1e293b; color: white; }
-        .adm-field input:focus, .adm-field select:focus { border-color: rgba(234,179,8,0.4); background: rgba(255,255,255,0.06); }
-        .adm-btn { padding: 13px 28px; background: linear-gradient(135deg,#eab308,#f59e0b); color: #080c14; border: none; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; font-family: 'Syne', sans-serif; transition: all 0.2s; }
-        .adm-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(234,179,8,0.3); }
-        .adm-btn-row { display: flex; gap: 12px; flex-wrap: wrap; }
-        .adm-email-btn { padding: 13px 28px; background: linear-gradient(135deg,#2563eb,#1d4ed8); color: white; border: none; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; font-family: 'Syne', sans-serif; transition: all 0.2s; }
-        .adm-email-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(37,99,235,0.3); }
-        .adm-email-btn:disabled { opacity: 0.6; transform: none; cursor: not-allowed; }
-        .adm-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-        .adm-table { width: 100%; border-collapse: collapse; min-width: 480px; }
-        .adm-table th { padding: 12px 16px; text-align: left; font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 1px solid rgba(255,255,255,0.06); }
-        .adm-table td { padding: 14px 16px; font-size: 14px; color: #94a3b8; border-bottom: 1px solid rgba(255,255,255,0.03); }
-        .adm-table tr:hover td { background: rgba(255,255,255,0.02); }
-        .adm-emp-name { color: white; font-weight: 500; }
-        .adm-del-btn { background: rgba(239,68,68,0.1); color: #f87171; border: 1px solid rgba(239,68,68,0.2); padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; transition: all 0.2s; white-space: nowrap; }
-        .adm-del-btn:hover { background: rgba(239,68,68,0.2); }
-        .adm-approve-btn { background: rgba(34,197,94,0.1); color: #86efac; border: 1px solid rgba(34,197,94,0.2); padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; margin-right: 6px; white-space: nowrap; }
-        .adm-reject-btn { background: rgba(239,68,68,0.1); color: #f87171; border: 1px solid rgba(239,68,68,0.2); padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; white-space: nowrap; }
-        .adm-salary-result { margin-top: 28px; background: rgba(234,179,8,0.05); border: 1px solid rgba(234,179,8,0.15); border-radius: 16px; padding: 24px; }
-        .adm-salary-result h4 { font-family: 'Syne', sans-serif; font-size: 16px; color: #eab308; margin-bottom: 16px; }
-        .adm-salary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px; margin-bottom: 20px; }
-        .adm-salary-item { display: flex; flex-direction: column; gap: 4px; }
-        .adm-salary-item span { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.6px; }
-        .adm-salary-item strong { font-size: 16px; color: white; font-weight: 600; }
-        .adm-salary-total { font-family: 'Syne', sans-serif; font-size: 32px; font-weight: 800; color: #eab308; }
-        .empty-state { text-align: center; padding: 60px 20px; color: #334155; font-size: 15px; }
-        .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; }
-
-        /* ── MOBILE ── */
-        .adm-mobile-bar { display: none; }
-        .adm-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 98; }
-        .adm-overlay.open { display: block; }
-        .adm-sidebar-close { display: none; background: none; border: none; color: #475569; font-size: 20px; cursor: pointer; margin-left: auto; line-height: 1; }
-
-        @media (max-width: 768px) {
-          .adm-mobile-bar { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; background: #0d1628; border-bottom: 1px solid rgba(255,255,255,0.06); position: sticky; top: 0; z-index: 97; }
-          .adm-hamburger { background: none; border: none; color: white; font-size: 24px; cursor: pointer; line-height: 1; padding: 2px 6px; }
-          .adm-mobile-logo { display: flex; align-items: center; gap: 8px; }
-          .adm-mobile-badge { background: rgba(234,179,8,0.1); border: 1px solid rgba(234,179,8,0.2); color: #eab308; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
-          .adm-sidebar { left: -260px; transition: left 0.28s ease; z-index: 99; background: #0d1628; }
-          .adm-sidebar.open { left: 0; }
-          .adm-sidebar-close { display: block; }
-          .adm-main { margin-left: 0; padding: 16px 14px 40px; }
-          .adm-topbar { margin-bottom: 16px; }
-          .adm-page-title { font-size: 20px; }
-          .adm-badge { display: none; }
-          .adm-stats { gap: 8px; margin-bottom: 16px; }
-          .adm-stat { padding: 14px 10px; border-radius: 12px; }
-          .adm-stat-num { font-size: 22px; }
-          .adm-stat-label { font-size: 9px; }
-          .adm-stat-icon { display: none; }
-          .adm-card { padding: 16px 14px; border-radius: 14px; }
-          .adm-card-title { font-size: 16px; margin-bottom: 16px; }
-          .adm-form-grid { grid-template-columns: 1fr; gap: 12px; margin-bottom: 16px; }
-          .adm-field input, .adm-field select { font-size: 16px; }
-          .adm-btn, .adm-email-btn { width: 100%; padding: 14px; font-size: 15px; }
-          .adm-btn-row { flex-direction: column; }
-          .adm-salary-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
-          .adm-salary-total { font-size: 24px; }
+        @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;500;600;700;800&family=Instrument+Sans:wght@400;500;600&display=swap');
+        *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+        :root {
+          --bg:#06070f; --surface:#0f1020; --surface2:#161728; --surface3:#1e2035;
+          --border:rgba(139,92,246,0.1); --border2:rgba(139,92,246,0.2); --border3:rgba(139,92,246,0.35);
+          --v1:#7c3aed; --v2:#8b5cf6; --v3:#a78bfa; --v4:#c4b5fd;
+          --pink:#ec4899; --pink2:#f472b6;
+          --text:#f0f0ff; --text2:#9898c0; --text3:#4a4a70;
+          --card-shadow:0 4px 24px rgba(0,0,0,0.5),0 1px 0 rgba(139,92,246,0.06) inset;
+          --card-shadow-hover:0 8px 40px rgba(0,0,0,0.65),0 0 0 1px rgba(139,92,246,0.2),0 1px 0 rgba(139,92,246,0.12) inset;
+        }
+        body { background:var(--bg); }
+        @keyframes toastIn{from{opacity:0;transform:translateX(20px);}to{opacity:1;transform:translateX(0);}}
+        @keyframes fadeUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+        .adm { display:flex; min-height:100vh; background:var(--bg); font-family:'Instrument Sans',sans-serif; color:var(--text); }
+        .adm-sb { width:260px; background:var(--surface); border-right:1px solid var(--border); display:flex; flex-direction:column; flex-shrink:0; box-shadow:4px 0 32px rgba(0,0,0,0.4); position:fixed; top:0; bottom:0; left:0; z-index:100; overflow-y:auto; }
+        .adm-sb-header { padding:26px 20px 22px; background:linear-gradient(180deg,rgba(124,58,237,0.12) 0%,transparent 100%); border-bottom:1px solid var(--border); }
+        .adm-sb-logo { display:flex; align-items:center; gap:12px; margin-bottom:18px; }
+        .adm-lmark { width:40px; height:40px; background:linear-gradient(135deg,#7c3aed,#ec4899); border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:900; color:white; box-shadow:0 4px 16px rgba(124,58,237,0.4); flex-shrink:0; }
+        .adm-lname { font-family:'Bricolage Grotesque',sans-serif; font-size:19px; font-weight:800; color:var(--text); }
+        .adm-lname em { color:var(--v3); font-style:normal; }
+        .adm-who { display:flex; align-items:center; gap:10px; background:rgba(139,92,246,0.08); border:1px solid var(--border2); border-radius:12px; padding:10px 13px; }
+        .adm-who-av { width:32px; height:32px; background:linear-gradient(135deg,#7c3aed,#ec4899); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:800; color:white; flex-shrink:0; }
+        .adm-who-name { font-size:13px; font-weight:700; color:var(--text); }
+        .adm-who-role { font-size:10px; color:var(--v3); font-weight:600; text-transform:uppercase; letter-spacing:0.5px; }
+        .adm-who-dot { width:7px; height:7px; background:#10b981; border-radius:50%; margin-left:auto; box-shadow:0 0 6px #10b981; flex-shrink:0; }
+        .adm-nav-wrap { flex:1; padding:14px 12px; }
+        .adm-section { font-size:9px; font-weight:700; color:var(--text3); text-transform:uppercase; letter-spacing:1.2px; padding:0 10px; margin-bottom:5px; margin-top:14px; }
+        .adm-nav { display:flex; flex-direction:column; gap:2px; }
+        .adm-nb { display:flex; align-items:center; gap:10px; padding:10px 13px; border:none; background:transparent; color:var(--text2); border-radius:11px; cursor:pointer; font-size:13px; font-weight:500; width:100%; text-align:left; transition:all 0.15s; font-family:'Instrument Sans',sans-serif; }
+        .adm-nb:hover { background:rgba(139,92,246,0.08); color:var(--text); }
+        .adm-nb.on { background:rgba(139,92,246,0.14); color:var(--v4); font-weight:600; border:1px solid rgba(139,92,246,0.15); }
+        .adm-nb-ico { width:28px; height:28px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:13px; flex-shrink:0; }
+        .adm-nb-badge { margin-left:auto; background:#ec4899; color:white; font-size:9px; font-weight:700; padding:2px 7px; border-radius:100px; box-shadow:0 2px 8px rgba(236,72,153,0.4); }
+        .adm-sb-stats { padding:14px 20px; border-top:1px solid var(--border); }
+        .adm-sb-stats-title { font-size:9px; font-weight:700; color:var(--text3); text-transform:uppercase; letter-spacing:1px; margin-bottom:10px; }
+        .adm-sb-mini { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+        .adm-sb-ms { background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:10px; text-align:center; }
+        .adm-sb-ms-num { font-family:'Bricolage Grotesque',sans-serif; font-size:18px; font-weight:800; }
+        .adm-sb-ms-lbl { font-size:9px; color:var(--text3); text-transform:uppercase; letter-spacing:0.4px; margin-top:1px; }
+        .adm-sb-foot { padding:12px 20px 20px; border-top:1px solid var(--border); }
+        .adm-out { display:flex; align-items:center; gap:10px; padding:10px 13px; border:none; background:transparent; color:var(--text3); border-radius:11px; cursor:pointer; font-size:13px; width:100%; font-family:'Instrument Sans',sans-serif; transition:all 0.15s; }
+        .adm-out:hover { background:rgba(244,63,94,0.08); color:#fb7185; }
+        .adm-main { margin-left:260px; flex:1; padding:32px 34px 60px; }
+        .adm-topbar { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:28px; animation:fadeUp 0.4s ease; }
+        .adm-ptitle { font-family:'Bricolage Grotesque',sans-serif; font-size:24px; font-weight:800; color:var(--text); letter-spacing:-0.5px; }
+        .adm-psub { font-size:12px; color:var(--text3); margin-top:3px; }
+        .adm-chip { background:rgba(139,92,246,0.1); border:1px solid var(--border2); color:var(--v4); padding:7px 16px; border-radius:100px; font-size:12px; font-weight:700; }
+        .adm-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:22px; animation:fadeUp 0.4s ease 0.05s both; }
+        .adm-stat { background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:24px; position:relative; overflow:hidden; box-shadow:var(--card-shadow); transition:all 0.25s; }
+        .adm-stat:hover { box-shadow:var(--card-shadow-hover); transform:translateY(-3px); }
+        .adm-stat::after { content:''; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg,transparent,rgba(255,255,255,0.07),transparent); }
+        .adm-stat-glow { position:absolute; width:140px; height:140px; border-radius:50%; filter:blur(50px); top:-40px; right:-40px; opacity:0.35; }
+        .adm-st-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; position:relative; }
+        .adm-st-ico { width:44px; height:44px; border-radius:13px; display:flex; align-items:center; justify-content:center; font-size:20px; }
+        .adm-st-tag { font-size:10px; font-weight:700; padding:3px 9px; border-radius:100px; }
+        .adm-st-num { font-family:'Bricolage Grotesque',sans-serif; font-size:38px; font-weight:800; color:var(--text); letter-spacing:-2px; line-height:1; position:relative; }
+        .adm-st-lbl { font-size:11px; color:var(--text3); margin-top:6px; text-transform:uppercase; letter-spacing:0.8px; position:relative; }
+        .adm-grid2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; animation:fadeUp 0.4s ease 0.1s both; }
+        .adm-card { background:var(--surface); border:1px solid var(--border); border-radius:22px; padding:26px; box-shadow:var(--card-shadow); transition:all 0.2s; position:relative; overflow:hidden; }
+        .adm-card::after { content:''; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg,transparent,rgba(139,92,246,0.1),transparent); }
+        .adm-card:hover { border-color:var(--border2); box-shadow:var(--card-shadow-hover); }
+        .adm-card-full { background:var(--surface); border:1px solid var(--border); border-radius:22px; padding:26px; box-shadow:var(--card-shadow); position:relative; overflow:hidden; animation:fadeUp 0.4s ease 0.15s both; }
+        .adm-card-full::after { content:''; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg,transparent,rgba(139,92,246,0.1),transparent); }
+        .adm-ch { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px; }
+        .adm-ct { font-family:'Bricolage Grotesque',sans-serif; font-size:16px; font-weight:700; color:var(--text); }
+        .adm-cs { font-size:11px; color:var(--text3); margin-top:2px; }
+        .adm-btn { padding:9px 18px; background:linear-gradient(135deg,#7c3aed,#ec4899); color:white; border:none; border-radius:9px; font-size:12px; font-weight:700; cursor:pointer; font-family:'Instrument Sans',sans-serif; box-shadow:0 4px 14px rgba(124,58,237,0.3); transition:all 0.2s; white-space:nowrap; }
+        .adm-btn:hover { transform:translateY(-1px); box-shadow:0 6px 20px rgba(124,58,237,0.4); }
+        .adm-email-btn { padding:10px 20px; background:linear-gradient(135deg,#0ea5e9,#6366f1); color:white; border:none; border-radius:9px; font-size:13px; font-weight:700; cursor:pointer; font-family:'Instrument Sans',sans-serif; transition:all 0.2s; box-shadow:0 4px 14px rgba(14,165,233,0.25); }
+        .adm-email-btn:hover { transform:translateY(-1px); }
+        .adm-email-btn:disabled { opacity:0.5; transform:none; cursor:not-allowed; }
+        .adm-feed { display:flex; flex-direction:column; }
+        .adm-fi { display:flex; align-items:flex-start; gap:12px; padding:12px 0; border-bottom:1px solid rgba(139,92,246,0.05); }
+        .adm-fi:last-child { border-bottom:none; }
+        .adm-fd { width:8px; height:8px; border-radius:50%; margin-top:5px; flex-shrink:0; }
+        .adm-ft { font-size:13px; color:var(--text); }
+        .adm-ft span { color:var(--v3); font-weight:700; }
+        .adm-ftime { font-size:10px; color:var(--text3); margin-top:2px; }
+        .adm-ps { display:flex; flex-direction:column; gap:10px; }
+        .adm-ps-row { display:flex; justify-content:space-between; align-items:center; padding:12px 14px; background:var(--surface2); border:1px solid var(--border); border-radius:12px; }
+        .adm-ps-left { display:flex; align-items:center; gap:10px; }
+        .adm-ps-ico { width:32px; height:32px; border-radius:9px; display:flex; align-items:center; justify-content:center; font-size:14px; }
+        .adm-ps-name { font-size:13px; font-weight:600; color:var(--text); }
+        .adm-ps-month { font-size:10px; color:var(--text3); margin-top:1px; }
+        .adm-ps-amt { font-family:'Bricolage Grotesque',sans-serif; font-size:16px; font-weight:800; color:var(--v3); }
+        .adm-form-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:14px; margin-bottom:20px; }
+        .adm-fld label { display:block; font-size:10px; font-weight:700; color:var(--text2); text-transform:uppercase; letter-spacing:0.8px; margin-bottom:7px; }
+        .adm-fld input, .adm-fld select { width:100%; padding:12px 14px; background:var(--surface2); border:1px solid var(--border); border-radius:11px; font-size:14px; color:var(--text); outline:none; font-family:'Instrument Sans',sans-serif; transition:all 0.2s; }
+        .adm-fld input::placeholder { color:var(--text3); }
+        .adm-fld select option { background:#161728; }
+        .adm-fld input:focus, .adm-fld select:focus { border-color:#8b5cf6; box-shadow:0 0 0 3px rgba(139,92,246,0.12); }
+        .adm-table { width:100%; border-collapse:collapse; }
+        .adm-table th { padding:10px 14px; text-align:left; font-size:10px; font-weight:700; color:var(--text3); text-transform:uppercase; letter-spacing:1px; border-bottom:1px solid var(--border); }
+        .adm-table td { padding:13px 14px; font-size:13px; color:var(--text2); border-bottom:1px solid rgba(139,92,246,0.05); }
+        .adm-table tr:hover td { background:rgba(139,92,246,0.04); }
+        .emp-n { color:var(--text)!important; font-weight:600!important; }
+        .del-btn { background:rgba(244,63,94,0.08); color:#fb7185; border:1px solid rgba(244,63,94,0.15); padding:5px 12px; border-radius:7px; cursor:pointer; font-size:11px; font-weight:600; transition:all 0.15s; }
+        .del-btn:hover { background:rgba(244,63,94,0.15); }
+        .ap-btn { background:rgba(16,185,129,0.08); color:#34d399; border:1px solid rgba(16,185,129,0.2); padding:5px 10px; border-radius:7px; cursor:pointer; font-size:11px; font-weight:700; margin-right:6px; }
+        .rj-btn { background:rgba(244,63,94,0.08); color:#fb7185; border:1px solid rgba(244,63,94,0.15); padding:5px 10px; border-radius:7px; cursor:pointer; font-size:11px; font-weight:700; }
+        .badge { padding:3px 10px; border-radius:100px; font-size:10px; font-weight:700; }
+        .sal-result { margin-top:22px; background:linear-gradient(135deg,rgba(124,58,237,0.1),rgba(236,72,153,0.06)); border:1px solid rgba(139,92,246,0.2); border-radius:16px; padding:22px; }
+        .sal-result h4 { font-family:'Bricolage Grotesque',sans-serif; font-size:15px; font-weight:700; color:var(--v3); margin-bottom:16px; }
+        .sal-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(100px,1fr)); gap:12px; margin-bottom:18px; }
+        .sal-item span { font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:0.5px; display:block; }
+        .sal-item strong { font-size:16px; color:var(--text); font-weight:700; margin-top:2px; display:block; }
+        .sal-total { font-family:'Bricolage Grotesque',sans-serif; font-size:30px; font-weight:800; color:var(--v3); }
+        .empty-st { text-align:center; padding:50px 20px; color:var(--text3); font-size:13px; }
+        .adm-mobile-bar { display:none; }
+        .adm-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:98; backdrop-filter:blur(4px); }
+        .adm-overlay.open { display:block; }
+        .adm-sb-close { display:none; background:none; border:none; color:var(--text3); font-size:20px; cursor:pointer; margin-left:auto; }
+        @media(max-width:900px){
+          .adm-mobile-bar{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:97;}
+          .adm-hamburger{background:none;border:none;color:var(--text);font-size:22px;cursor:pointer;}
+          .adm-sb{left:-280px;transition:left 0.28s ease;}
+          .adm-sb.open{left:0;}
+          .adm-sb-close{display:block;}
+          .adm-main{margin-left:0;padding:16px 14px 40px;}
+          .adm-chip{display:none;}
+          .adm-stats{grid-template-columns:repeat(3,1fr);gap:8px;}
+          .adm-stat{padding:14px 10px;}
+          .adm-st-num{font-size:26px;}
+          .adm-grid2{grid-template-columns:1fr;}
+          .adm-form-grid{grid-template-columns:1fr;}
+          .adm-fld input,.adm-fld select{font-size:16px;}
+          .adm-btn,.adm-email-btn{width:100%;padding:13px;}
+          .sal-grid{grid-template-columns:repeat(2,1fr);}
         }
       `}</style>
 
-      <div className="adm-page">
+      <Toast toasts={toasts} remove={removeToast} />
+
+      <div className="adm">
         {/* Mobile bar */}
         <div className="adm-mobile-bar">
           <button className="adm-hamburger" onClick={() => setSidebarOpen(true)}>☰</button>
-          <div className="adm-mobile-logo">
-            <div className="adm-logo-icon">₹</div>
-            <div className="adm-logo-text">Payroll<span>Pro</span></div>
+          <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
+            <div className="adm-lmark">₹</div>
+            <div className="adm-lname">Payroll<em>Pro</em></div>
           </div>
-          <div className="adm-mobile-badge">Admin</div>
+          <div className="adm-chip" style={{ fontSize:"11px", padding:"5px 12px" }}>Admin</div>
         </div>
 
-        <div className={`adm-overlay ${sidebarOpen ? "open" : ""}`} onClick={() => setSidebarOpen(false)} />
+        <div className={`adm-overlay ${sidebarOpen?"open":""}`} onClick={() => setSidebarOpen(false)} />
 
         {/* Sidebar */}
-        <div className={`adm-sidebar ${sidebarOpen ? "open" : ""}`}>
-          <div className="adm-logo">
-            <div className="adm-logo-icon">₹</div>
-            <div className="adm-logo-text">Payroll<span>Pro</span></div>
-            <button className="adm-sidebar-close" onClick={() => setSidebarOpen(false)}>✕</button>
+        <div className={`adm-sb ${sidebarOpen?"open":""}`}>
+          <div className="adm-sb-header">
+            <div className="adm-sb-logo">
+              <div className="adm-lmark">₹</div>
+              <div className="adm-lname">Payroll<em>Pro</em></div>
+              <button className="adm-sb-close" onClick={() => setSidebarOpen(false)}>✕</button>
+            </div>
+            <div className="adm-who">
+              <div className="adm-who-av">A</div>
+              <div><div className="adm-who-name">Admin</div><div className="adm-who-role">Super Admin</div></div>
+              <div className="adm-who-dot" />
+            </div>
           </div>
-          <nav className="adm-nav">
-            {tabs.map(t => (
-              <button key={t.id} className={`adm-nav-btn ${activeTab === t.id ? "active" : ""}`} onClick={() => handleTabSelect(t.id)}>
-                <span className="adm-nav-icon">{t.icon}</span> {t.label}
-                {t.id === "leaves" && pendingLeaves > 0 && <span className="adm-nav-badge">{pendingLeaves}</span>}
-              </button>
+
+          <div className="adm-nav-wrap">
+            {navGroups.map(g => (
+              <div key={g.label}>
+                <div className="adm-section">{g.label}</div>
+                <nav className="adm-nav">
+                  {g.items.map(item => (
+                    <button key={item.id} className={`adm-nb ${activeTab===item.id?"on":""}`} onClick={() => { setActiveTab(item.id); setSidebarOpen(false); }}>
+                      <div className="adm-nb-ico" style={{ background:item.bg, color:item.color }}>{item.icon}</div>
+                      {item.label}
+                      {item.badge > 0 && <span className="adm-nb-badge">{item.badge}</span>}
+                    </button>
+                  ))}
+                </nav>
+              </div>
             ))}
-          </nav>
-          <button className="adm-logout" onClick={handleLogout}>🚪 Logout</button>
+          </div>
+
+          <div className="adm-sb-stats">
+            <div className="adm-sb-stats-title">Today at a glance</div>
+            <div className="adm-sb-mini">
+              <div className="adm-sb-ms"><div className="adm-sb-ms-num" style={{ color:"#34d399" }}>{presentToday}</div><div className="adm-sb-ms-lbl">Present</div></div>
+              <div className="adm-sb-ms"><div className="adm-sb-ms-num" style={{ color:"#fb7185" }}>{absentToday}</div><div className="adm-sb-ms-lbl">Absent</div></div>
+            </div>
+          </div>
+
+          <div className="adm-sb-foot">
+            <button className="adm-out" onClick={handleLogout}>🚪 Sign out</button>
+          </div>
         </div>
 
         {/* Main */}
         <div className="adm-main">
           <div className="adm-topbar">
             <div>
-              <div className="adm-page-title">Admin Dashboard</div>
-              <div className="adm-page-sub">Manage your team's payroll & attendance</div>
+              <div className="adm-ptitle">Good morning, Admin 👋</div>
+              <div className="adm-psub">{new Date().toLocaleDateString("en-IN",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}</div>
             </div>
-            <div className="adm-badge">👤 Admin</div>
+            <div className="adm-chip">⚙️ Admin Panel</div>
           </div>
 
+          {/* Stats */}
           <div className="adm-stats">
-            <div className="adm-stat blue"><div className="adm-stat-icon">👥</div><div className="adm-stat-num">{employees.length}</div><div className="adm-stat-label">Total Employees</div></div>
-            <div className="adm-stat gold"><div className="adm-stat-icon">✅</div><div className="adm-stat-num">{presentToday}</div><div className="adm-stat-label">Present Today</div></div>
-            <div className="adm-stat red"><div className="adm-stat-icon">❌</div><div className="adm-stat-num">{Math.max(0, employees.length - presentToday)}</div><div className="adm-stat-label">Absent Today</div></div>
+            <div className="adm-stat">
+              <div className="adm-stat-glow" style={{ background:"#7c3aed" }} />
+              <div className="adm-st-top"><div className="adm-st-ico" style={{ background:"rgba(124,58,237,0.15)",color:"#a78bfa" }}>👥</div><span className="adm-st-tag" style={{ background:"rgba(124,58,237,0.1)",color:"#c4b5fd" }}>Total</span></div>
+              <div className="adm-st-num">{employees.length}</div><div className="adm-st-lbl">Employees</div>
+            </div>
+            <div className="adm-stat">
+              <div className="adm-stat-glow" style={{ background:"#10b981" }} />
+              <div className="adm-st-top"><div className="adm-st-ico" style={{ background:"rgba(16,185,129,0.15)",color:"#34d399" }}>✅</div><span className="adm-st-tag" style={{ background:"rgba(16,185,129,0.1)",color:"#6ee7b7" }}>Today</span></div>
+              <div className="adm-st-num">{presentToday}</div><div className="adm-st-lbl">Present</div>
+            </div>
+            <div className="adm-stat">
+              <div className="adm-stat-glow" style={{ background:"#f43f5e" }} />
+              <div className="adm-st-top"><div className="adm-st-ico" style={{ background:"rgba(244,63,94,0.15)",color:"#fb7185" }}>❌</div><span className="adm-st-tag" style={{ background:"rgba(244,63,94,0.1)",color:"#fda4af" }}>Today</span></div>
+              <div className="adm-st-num">{absentToday}</div><div className="adm-st-lbl">Absent</div>
+            </div>
           </div>
 
-          {message.text && (
-            <div className={`adm-msg ${message.type === "error" ? "error" : "success"}`}>
-              {message.type === "error" ? "⚠" : "✓"} {message.text}
+          {/* Overview */}
+          {activeTab === "overview" && (
+            <>
+              <div className="adm-grid2">
+                <div className="adm-card">
+                  <div className="adm-ch"><div><div className="adm-ct">Recent Activity</div><div className="adm-cs">Latest actions on your team</div></div></div>
+                  <div className="adm-feed">
+                    {[
+                      { dot:"#34d399", text:<>Attendance marked for <span>your team</span></>, time:"Just now" },
+                      { dot:"#fbbf24", text:<>Leave request pending approval</>, time:"Check Leaves tab" },
+                      { dot:"#a78bfa", text:<>Salary calculations ready</>, time:"Go to Salary tab" },
+                      { dot:"#f472b6", text:<>Add new team members</>, time:"Go to Add Employee" },
+                    ].map((f,i) => (
+                      <div className="adm-fi" key={i}>
+                        <div className="adm-fd" style={{ background:f.dot, boxShadow:`0 0 6px ${f.dot}` }} />
+                        <div><div className="adm-ft">{f.text}</div><div className="adm-ftime">{f.time}</div></div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="adm-card">
+                  <div className="adm-ch"><div><div className="adm-ct">Team Summary</div><div className="adm-cs">{employees.length} employees registered</div></div><button className="adm-btn" onClick={() => setActiveTab("add")}>+ Add New</button></div>
+                  <div className="adm-ps">
+                    {employees.slice(0,3).map((e,i) => {
+                      const colors = [["rgba(124,58,237,0.12)","#a78bfa"],["rgba(20,184,166,0.12)","#2dd4bf"],["rgba(245,158,11,0.12)","#fbbf24"]];
+                      return (
+                        <div className="adm-ps-row" key={e._id}>
+                          <div className="adm-ps-left">
+                            <div className="adm-ps-ico" style={{ background:colors[i%3][0], color:colors[i%3][1] }}>👤</div>
+                            <div><div className="adm-ps-name">{e.name}</div><div className="adm-ps-month">{e.position}</div></div>
+                          </div>
+                          <div className="adm-ps-amt">₹{e.salaryPerDay}/day</div>
+                        </div>
+                      );
+                    })}
+                    {employees.length === 0 && <div className="empty-st">No employees yet. Add one!</div>}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Employees */}
+          {activeTab === "employees" && (
+            <div className="adm-card-full">
+              <div className="adm-ch"><div><div className="adm-ct">All Employees</div><div className="adm-cs">{employees.length} members</div></div><button className="adm-btn" onClick={() => setActiveTab("add")}>+ Add New</button></div>
+              {employees.length === 0 ? <div className="empty-st">No employees yet.</div> : (
+                <div style={{ overflowX:"auto" }}>
+                  <table className="adm-table">
+                    <thead><tr><th>Name</th><th>Email</th><th>Position</th><th>₹/Day</th><th>Action</th></tr></thead>
+                    <tbody>{employees.map(e => (
+                      <tr key={e._id}><td className="emp-n">{e.name}</td><td>{e.email}</td><td>{e.position}</td><td>₹{e.salaryPerDay}</td><td><button className="del-btn" onClick={() => handleDeleteEmployee(e._id)}>Delete</button></td></tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
 
-          <div className="adm-card">
+          {/* Add Employee */}
+          {activeTab === "add" && (
+            <div className="adm-card-full">
+              <div className="adm-ch"><div><div className="adm-ct">Add New Employee</div><div className="adm-cs">Fill in the details below</div></div></div>
+              <form onSubmit={handleAddEmployee}>
+                <div className="adm-form-grid">
+                  {[["Full Name","text","John Doe","name"],["Email","email","john@co.com","email"],["Password","password","Set password","password"],["Position","text","Developer","position"]].map(([l,t,p,k]) => (
+                    <div className="adm-fld" key={k}><label>{l}</label><input type={t} placeholder={p} value={empForm[k]} onChange={e => setEmpForm({...empForm,[k]:e.target.value})} required /></div>
+                  ))}
+                  <div className="adm-fld"><label>Salary Per Day (₹)</label><input type="number" placeholder="1000" value={empForm.salaryPerDay} onChange={e => setEmpForm({...empForm,salaryPerDay:e.target.value})} required /></div>
+                </div>
+                <button type="submit" className="adm-btn">Add Employee</button>
+              </form>
+            </div>
+          )}
 
-            {activeTab === "employees" && (
-              <>
-                <div className="adm-card-title">All Employees</div>
-                {employees.length === 0 ? <div className="empty-state">No employees yet.</div> : (
-                  <div className="adm-table-scroll">
-                    <table className="adm-table">
-                      <thead><tr><th>Name</th><th>Email</th><th>Position</th><th>Salary/Day</th><th>Action</th></tr></thead>
-                      <tbody>
-                        {employees.map(emp => (
-                          <tr key={emp._id}>
-                            <td className="adm-emp-name">{emp.name}</td>
-                            <td>{emp.email}</td>
-                            <td>{emp.position}</td>
-                            <td>₹{emp.salaryPerDay}</td>
-                            <td><button className="adm-del-btn" onClick={() => handleDeleteEmployee(emp._id)}>Delete</button></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+          {/* Attendance */}
+          {activeTab === "attendance" && (
+            <div className="adm-card-full">
+              <div className="adm-ch"><div><div className="adm-ct">Mark Attendance</div><div className="adm-cs">Record daily attendance</div></div></div>
+              <form onSubmit={handleMarkAttendance}>
+                <div className="adm-form-grid">
+                  <div className="adm-fld"><label>Employee</label><select value={attForm.employeeId} onChange={e => setAttForm({...attForm,employeeId:e.target.value})} required><option value="">Select Employee</option>{employees.map(e => <option key={e._id} value={e._id}>{e.name}</option>)}</select></div>
+                  <div className="adm-fld"><label>Date</label><input type="date" value={attForm.date} onChange={e => setAttForm({...attForm,date:e.target.value})} required /></div>
+                  <div className="adm-fld"><label>Status</label><select value={attForm.status} onChange={e => setAttForm({...attForm,status:e.target.value})}><option>Present</option><option>Absent</option><option>Half Day</option><option>Leave</option></select></div>
+                </div>
+                <button type="submit" className="adm-btn">Mark Attendance</button>
+              </form>
+            </div>
+          )}
+
+          {/* Salary */}
+          {activeTab === "salary" && (
+            <div className="adm-card-full">
+              <div className="adm-ch"><div><div className="adm-ct">Calculate Salary</div><div className="adm-cs">Monthly payroll</div></div></div>
+              <form onSubmit={handleCalculateSalary}>
+                <div className="adm-form-grid">
+                  <div className="adm-fld"><label>Employee</label><select value={salaryForm.employeeId} onChange={e => setSalaryForm({...salaryForm,employeeId:e.target.value})} required><option value="">Select Employee</option>{employees.map(e => <option key={e._id} value={e._id}>{e.name}</option>)}</select></div>
+                  <div className="adm-fld"><label>Month</label><select value={salaryForm.month} onChange={e => setSalaryForm({...salaryForm,month:e.target.value})} required><option value="">Select Month</option>{["January","February","March","April","May","June","July","August","September","October","November","December"].map(m => <option key={m}>{m}</option>)}</select></div>
+                  <div className="adm-fld"><label>Year</label><input type="number" placeholder="2026" value={salaryForm.year} onChange={e => setSalaryForm({...salaryForm,year:e.target.value})} required /></div>
+                </div>
+                <button type="submit" className="adm-btn">Calculate Salary</button>
+              </form>
+              {salaryResult && (
+                <div className="sal-result">
+                  <h4>💰 {salaryResult.employeeName} — {salaryResult.month} {salaryResult.year}</h4>
+                  <div className="sal-grid">
+                    <div className="sal-item"><span>Working Days</span><strong>{salaryResult.totalDays}</strong></div>
+                    <div className="sal-item"><span>Present</span><strong style={{ color:"#34d399" }}>{salaryResult.presentDays}</strong></div>
+                    <div className="sal-item"><span>Half Days</span><strong style={{ color:"#fbbf24" }}>{salaryResult.halfDays||0}</strong></div>
+                    <div className="sal-item"><span>Absent</span><strong style={{ color:"#fb7185" }}>{salaryResult.absentDays||0}</strong></div>
+                    <div className="sal-item"><span>Rate/Day</span><strong>₹{salaryResult.salaryPerDay}</strong></div>
+                    <div className="sal-item"><span>Total</span><strong className="sal-total">₹{salaryResult.totalSalary?.toLocaleString()}</strong></div>
                   </div>
-                )}
-              </>
-            )}
+                  <button className="adm-email-btn" onClick={handleSendPayslip} disabled={emailLoading}>{emailLoading?"Sending...":"📧 Send Payslip Email"}</button>
+                </div>
+              )}
+            </div>
+          )}
 
-            {activeTab === "add" && (
-              <>
-                <div className="adm-card-title">Add New Employee</div>
-                <form onSubmit={handleAddEmployee}>
-                  <div className="adm-form-grid">
-                    {[["Full Name","text","John Doe","name"],["Email","email","john@co.com","email"],["Password","password","Set password","password"],["Position","text","Developer","position"]].map(([label,type,ph,key]) => (
-                      <div className="adm-field" key={key}><label>{label}</label><input type={type} placeholder={ph} value={empForm[key]} onChange={e => setEmpForm({...empForm,[key]:e.target.value})} required /></div>
-                    ))}
-                    <div className="adm-field"><label>Salary Per Day (₹)</label><input type="number" placeholder="1000" value={empForm.salaryPerDay} onChange={e => setEmpForm({...empForm,salaryPerDay:e.target.value})} required /></div>
-                  </div>
-                  <button type="submit" className="adm-btn">Add Employee</button>
-                </form>
-              </>
-            )}
-
-            {activeTab === "attendance" && (
-              <>
-                <div className="adm-card-title">Mark Attendance</div>
-                <form onSubmit={handleMarkAttendance}>
-                  <div className="adm-form-grid">
-                    <div className="adm-field"><label>Employee</label>
-                      <select value={attForm.employeeId} onChange={e => setAttForm({...attForm,employeeId:e.target.value})} required>
-                        <option value="">Select Employee</option>
-                        {employees.map(e => <option key={e._id} value={e._id}>{e.name}</option>)}
-                      </select>
-                    </div>
-                    <div className="adm-field"><label>Date</label><input type="date" value={attForm.date} onChange={e => setAttForm({...attForm,date:e.target.value})} required /></div>
-                    <div className="adm-field"><label>Status</label>
-                      <select value={attForm.status} onChange={e => setAttForm({...attForm,status:e.target.value})}>
-                        <option>Present</option><option>Absent</option><option>Half Day</option><option>Leave</option>
-                      </select>
-                    </div>
-                  </div>
-                  <button type="submit" className="adm-btn">Mark Attendance</button>
-                </form>
-              </>
-            )}
-
-            {activeTab === "salary" && (
-              <>
-                <div className="adm-card-title">Calculate Salary</div>
-                <form onSubmit={handleCalculateSalary}>
-                  <div className="adm-form-grid">
-                    <div className="adm-field"><label>Employee</label>
-                      <select value={salaryForm.employeeId} onChange={e => setSalaryForm({...salaryForm,employeeId:e.target.value})} required>
-                        <option value="">Select Employee</option>
-                        {employees.map(e => <option key={e._id} value={e._id}>{e.name}</option>)}
-                      </select>
-                    </div>
-                    <div className="adm-field"><label>Month</label>
-                      <select value={salaryForm.month} onChange={e => setSalaryForm({...salaryForm,month:e.target.value})} required>
-                        <option value="">Select Month</option>
-                        {["January","February","March","April","May","June","July","August","September","October","November","December"].map(m => <option key={m}>{m}</option>)}
-                      </select>
-                    </div>
-                    <div className="adm-field"><label>Year</label><input type="number" placeholder="2026" value={salaryForm.year} onChange={e => setSalaryForm({...salaryForm,year:e.target.value})} required /></div>
-                  </div>
-                  <button type="submit" className="adm-btn">Calculate Salary</button>
-                </form>
-
-                {salaryResult && (
-                  <div className="adm-salary-result">
-                    <h4>💰 Salary Summary — {salaryResult.employeeName}</h4>
-                    <div className="adm-salary-grid">
-                      <div className="adm-salary-item"><span>Month</span><strong>{salaryResult.month} {salaryResult.year}</strong></div>
-                      <div className="adm-salary-item"><span>Working Days</span><strong>{salaryResult.totalDays}</strong></div>
-                      <div className="adm-salary-item"><span>Present</span><strong style={{color:"#86efac"}}>{salaryResult.presentDays}</strong></div>
-                      <div className="adm-salary-item"><span>Half Days</span><strong style={{color:"#fde68a"}}>{salaryResult.halfDays || 0}</strong></div>
-                      <div className="adm-salary-item"><span>Absent</span><strong style={{color:"#fca5a5"}}>{salaryResult.absentDays || 0}</strong></div>
-                      <div className="adm-salary-item"><span>Rate/Day</span><strong>₹{salaryResult.salaryPerDay}</strong></div>
-                      <div className="adm-salary-item"><span>Total Salary</span><strong className="adm-salary-total">₹{salaryResult.totalSalary?.toLocaleString()}</strong></div>
-                    </div>
-                    <div className="adm-btn-row">
-                      <button className="adm-email-btn" onClick={handleSendPayslip} disabled={emailLoading}>
-                        {emailLoading ? "Sending..." : "📧 Send Payslip to Employee"}
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-
-            {activeTab === "leaves" && (
-              <>
-                <div className="adm-card-title">Leave Requests {pendingLeaves > 0 && <span style={{background:"#ef4444",color:"white",fontSize:"12px",padding:"2px 10px",borderRadius:"20px",marginLeft:"10px"}}>{pendingLeaves} Pending</span>}</div>
-                {leaves.length === 0 ? <div className="empty-state">No leave requests yet.</div> : (
-                  <div className="adm-table-scroll">
-                    <table className="adm-table">
-                      <thead><tr><th>Employee</th><th>Type</th><th>From</th><th>To</th><th>Reason</th><th>Status</th><th>Action</th></tr></thead>
-                      <tbody>
-                        {leaves.map(leave => {
-                          const st = leaveStatusStyle(leave.status);
-                          return (
-                            <tr key={leave._id}>
-                              <td className="adm-emp-name">{leave.employeeName}</td>
-                              <td>{leave.type}</td>
-                              <td>{new Date(leave.fromDate).toLocaleDateString("en-IN")}</td>
-                              <td>{new Date(leave.toDate).toLocaleDateString("en-IN")}</td>
-                              <td style={{maxWidth:"160px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{leave.reason}</td>
-                              <td><span className="status-badge" style={{background:st.bg,color:st.color,border:`1px solid ${st.border}`}}>{leave.status}</span></td>
-                              <td>
-                                {leave.status === "Pending" && (
-                                  <>
-                                    <button className="adm-approve-btn" onClick={() => handleLeaveAction(leave._id, "Approved")}>✓ Approve</button>
-                                    <button className="adm-reject-btn" onClick={() => handleLeaveAction(leave._id, "Rejected")}>✗ Reject</button>
-                                  </>
-                                )}
-                                {leave.status !== "Pending" && <span style={{color:"#475569",fontSize:"12px"}}>Done</span>}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </>
-            )}
-
-          </div>
+          {/* Leaves */}
+          {activeTab === "leaves" && (
+            <div className="adm-card-full">
+              <div className="adm-ch"><div><div className="adm-ct">Leave Requests</div><div className="adm-cs">{pendingLeaves} pending approval</div></div>{pendingLeaves > 0 && <span className="badge" style={{ background:"rgba(244,63,94,0.1)",color:"#fb7185",border:"1px solid rgba(244,63,94,0.2)" }}>{pendingLeaves} Pending</span>}</div>
+              {leaves.length === 0 ? <div className="empty-st">No leave requests yet.</div> : (
+                <div style={{ overflowX:"auto" }}>
+                  <table className="adm-table">
+                    <thead><tr><th>Employee</th><th>Type</th><th>From</th><th>To</th><th>Reason</th><th>Status</th><th>Action</th></tr></thead>
+                    <tbody>{leaves.map(lv => {
+                      const st = stBadge(lv.status);
+                      return (
+                        <tr key={lv._id}>
+                          <td className="emp-n">{lv.employeeName}</td>
+                          <td>{lv.type}</td>
+                          <td>{new Date(lv.fromDate).toLocaleDateString("en-IN")}</td>
+                          <td>{new Date(lv.toDate).toLocaleDateString("en-IN")}</td>
+                          <td style={{ maxWidth:"120px", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{lv.reason}</td>
+                          <td><span className="badge" style={{ background:st.bg, color:st.c, border:`1px solid ${st.br}` }}>{lv.status}</span></td>
+                          <td>{lv.status==="Pending"?<><button className="ap-btn" onClick={() => handleLeaveAction(lv._id,"Approved")}>✓</button><button className="rj-btn" onClick={() => handleLeaveAction(lv._id,"Rejected")}>✗</button></>:<span style={{ color:"var(--text3)",fontSize:"11px" }}>Done</span>}</td>
+                        </tr>
+                      );
+                    })}</tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </>
   );
 }
-
 export default AdminDashboard;
