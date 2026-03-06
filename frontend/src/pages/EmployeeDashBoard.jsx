@@ -396,8 +396,8 @@ function EmployeeDashboard() {
         @media(max-width:900px){html,body{overflow-x:hidden;}
           .emp-mobile-bar{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:97;}
           .emp-hamburger{background:none;border:none;color:var(--text);font-size:22px;cursor:pointer;}
-          .emp-sb{left:-100vw;width:100vw;transition:left 0.3s ease;border-right:none;}
-          .emp-sb.open{left:0;}
+          .emp-sb{left:0;width:100vw;transition:transform 0.3s ease;border-right:none;transform:translateX(-100%);}
+          .emp-sb.open{transform:translateX(0);}
           .emp-sb-close{display:flex;align-items:center;justify-content:center;width:34px;height:34px;background:rgba(255,255,255,0.06);border-radius:8px;}
           .emp-main{margin-left:0;padding:16px 14px 40px;}
           .emp-hero{padding:18px 20px;}

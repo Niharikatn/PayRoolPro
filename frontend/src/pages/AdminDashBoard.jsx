@@ -224,8 +224,8 @@ function AdminDashboard() {
           html,body{overflow-x:hidden;}
           .adm-mobile-bar{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:97;}
           .adm-hamburger{background:none;border:none;color:var(--text);font-size:26px;cursor:pointer;line-height:1;padding:0;}
-          .adm-sb{left:-100vw;width:100vw;transition:left 0.3s ease;border-right:none;box-shadow:none;}
-          .adm-sb.open{left:0;box-shadow:4px 0 40px rgba(0,0,0,0.7);}
+          .adm-sb{left:0;width:100vw;transition:transform 0.3s ease;border-right:none;transform:translateX(-100%);}
+          .adm-sb.open{transform:translateX(0);}
           .adm-sb-close{display:flex;}
           .adm-main{margin-left:0;padding:16px 14px 60px;width:100%;overflow-x:hidden;}
           .adm-topbar{flex-direction:column;gap:6px;margin-bottom:16px;}
